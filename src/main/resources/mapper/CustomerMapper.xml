@@ -24,13 +24,22 @@
         <foreach item="item" collection="ids" open="(" separator="," close=")">
             #{item}
         </foreach>
-    </update>
-   <update id="updateStatusSingle">
-    UPDATE customer
-    SET status = 'PROCESSED',
-        updated_at = CURRENT_TIMESTAMP
-    WHERE id = #{id}
-</update>
-
+	</update>
+	<update id="updateStatusSingle">
+	    UPDATE customer
+	    SET status = 'PROCESSED',
+	        updated_at = CURRENT_TIMESTAMP
+	    WHERE id = #{id}
+	</update>
+	<select id="selectCustomersByStatusPending"   resultType="com.example.demo.batch.model.Customer">
+	  SELECT
+            id,
+            name,
+            email,
+            status,
+            created_at as createdAt
+        FROM customer
+        where status = 'PENDING'
+	</select>
 
 </mapper>

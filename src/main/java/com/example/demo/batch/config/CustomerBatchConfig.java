@@ -19,10 +19,12 @@ import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
+import org.springframework.batch.core.step.tasklet.Tasklet;
 import org.springframework.batch.integration.async.AsyncItemProcessor;
 import org.springframework.batch.integration.async.AsyncItemWriter;
 import org.springframework.batch.item.ItemProcessor;
 import org.springframework.batch.item.ItemWriter;
+import org.springframework.batch.repeat.RepeatStatus;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -191,5 +193,39 @@ public class CustomerBatchConfig {
         AsyncItemWriter<ProcessedCustomer> asyncWriter = new AsyncItemWriter<>();
         asyncWriter.setDelegate(customerItemWriter());
         return asyncWriter;
+    }
+    // =========================================================================
+    // Tasklet 예제 (한 번에 실행되는 배치)
+    // =========================================================================
+
+    @Bean(name = "customerMigrationTaskletJob")
+    public Job customerMigrationTaskletJob() {
+        return new JobBuilder("customerMigrationTaskletJob", jobRepository)
+                .start(customerMigrationTaskletStep())
+                .build();
+    }
+
+    @Bean
+    public Step customerMigrationTaskletStep() {
+        return new StepBuilder("customerMigrationTaskletStep", jobRepository)
+                .tasklet(customerMigrationTasklet(), transactionManager)
+                .build();
+    }
+
+    @Bean
+    public Tasklet customerMigrationTasklet() {
+        return (contribution, chunkContext) -> {
+            // 1. PENDING 상태의 전체 데이터 한 번에 조회
+            List<Customer> pendingCustomers = customerMapper.selectCustomersByStatusPending();
+            log.info("[Tasklet] Total pending customers fetched: {}", pendingCustomers.size());
+
+            if (pendingCustomers.isEmpty()) {
+                return RepeatStatus.FINISHED;
+            }
+            pendingCustomers.stream().forEach(s -> System.out.println(s.name()));
+
+            log.info("[Tasklet] Successfully processed total {} items.", pendingCustomers.size());
+            return RepeatStatus.FINISHED;
+        };
     }
 }

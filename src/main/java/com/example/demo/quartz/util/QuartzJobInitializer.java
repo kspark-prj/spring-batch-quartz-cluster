@@ -11,6 +11,7 @@ import org.springframework.scheduling.quartz.SchedulerFactoryBean;
 import org.springframework.stereotype.Component;
 
 import com.example.demo.quartz.dto.JobRequest;
+import com.example.demo.quartz.job.CustomerMigrationQuartzJob;
 import com.example.demo.quartz.job.SampleBatchTriggerJob;
 import com.example.demo.quartz.job.SampleSystemMonitoringJob;
 import com.example.demo.quartz.service.QuartzJobService;
@@ -59,6 +60,19 @@ public class QuartzJobInitializer implements CommandLineRunner {
             log.info("DefaultBatchTriggerJob이 정상 등록되었습니다.");
         }
 
+        JobKey taskletKey = new JobKey("CustomerMigrationTaskletJob", "BATCH_GROUP");
+
+        if (!scheduler.checkExists(taskletKey)) {
+            JobRequest request = new JobRequest(
+                    "CustomerMigrationTaskletJob",
+                    "BATCH_GROUP",
+                    "0 0/2 * * * ?",  // 원하는 Cron 표현식 (예: 2분마다 실행)
+                    Map.of("runBy", "Customer migration tasklet monitor")
+            );
+
+            // 위에서 작성한 CustomerMigrationQuartzJob 클래스를 지정합니다.
+            quartzJobService.addJob(request, CustomerMigrationQuartzJob.class);
+        }
         log.info("Quartz 스케줄링 자동 초기화 완료.");
     }
 }

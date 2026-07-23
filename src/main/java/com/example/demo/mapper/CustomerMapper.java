@@ -18,5 +18,6 @@ public interface CustomerMapper {
 
     void updateStatuses(@Param("ids") List<Integer> ids, @Param("status") String status);
     void updateStatusSingle(@Param("id") Integer ids);
+    List<Customer> selectCustomersByStatusPending();
 
 }
