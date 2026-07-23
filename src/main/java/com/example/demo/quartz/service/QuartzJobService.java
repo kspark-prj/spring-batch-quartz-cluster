@@ -117,6 +117,39 @@ public class QuartzJobService {
         }
     }
 
+    /**
+     * 기존 등록된 Job의 크론 표현식을 수정합니다.
+     */
+    public boolean updateCronExpression(String jobName, String jobGroup, String newCronExpression) {
+        try {
+            TriggerKey triggerKey = new TriggerKey(jobName + "_trigger", jobGroup);
+
+            if (!scheduler.checkExists(triggerKey)) {
+                log.warn("Trigger does not exist for update: {}", triggerKey);
+                return false;
+            }
+
+            CronTrigger newTrigger = TriggerBuilder.newTrigger()
+                    .withIdentity(triggerKey)
+                    .withSchedule(CronScheduleBuilder.cronSchedule(newCronExpression)
+                            .withMisfireHandlingInstructionDoNothing())
+                    .build();
+
+            Date rescheduledTime = scheduler.rescheduleJob(triggerKey, newTrigger);
+            if (rescheduledTime != null) {
+                log.info("Successfully updated Cron expression for Trigger: {} to [{}]. Next fire time: {}",
+                        triggerKey, newCronExpression, rescheduledTime);
+                return true;
+            } else {
+                log.warn("Failed to reschedule job for Trigger: {}", triggerKey);
+                return false;
+            }
+        } catch (SchedulerException e) {
+            log.error("Failed to update cron expression", e);
+            throw new RuntimeException("Quartz Job 크론 표현식 변경 실패", e);
+        }
+    }
+
     public boolean deleteJob(String jobName, String jobGroup) {
         try {
             JobKey jobKey = new JobKey(jobName, jobGroup);

@@ -32,8 +32,8 @@ public class QuartzJobController {
     public ResponseEntity<String> createJob(
             @RequestBody JobRequest request,
             @RequestParam(value = "type", defaultValue = "BATCH") String type) {
-        
-        Class<? extends org.quartz.Job> targetJobClass = 
+
+        Class<? extends org.quartz.Job> targetJobClass =
                 "MONITOR".equalsIgnoreCase(type) ? SampleSystemMonitoringJob.class : SampleBatchTriggerJob.class;
 
         boolean created = quartzJobService.addJob(request, targetJobClass);
@@ -48,7 +48,7 @@ public class QuartzJobController {
     public ResponseEntity<String> deleteJob(
             @RequestParam("name") String name,
             @RequestParam("group") String group) {
-        
+
         boolean deleted = quartzJobService.deleteJob(name, group);
         if (deleted) {
             return ResponseEntity.ok("스케줄 Job이 삭제되었습니다.");
@@ -56,12 +56,28 @@ public class QuartzJobController {
             return ResponseEntity.status(404).body("삭제하려는 Job 정보를 찾을 수 없습니다.");
         }
     }
+    /**
+     * 특정 Job의 크론 표현식(Cron Expression)을 변경합니다.
+     */
+    @PutMapping("/jobs/cron")
+    public ResponseEntity<String> updateJobCron(
+            @RequestParam("name") String name,
+            @RequestParam("group") String group,
+            @RequestParam("cronExpression") String cronExpression) {
+
+        boolean updated = quartzJobService.updateCronExpression(name, group, cronExpression);
+        if (updated) {
+            return ResponseEntity.ok("스케줄 Job의 크론 표현식이 성공적으로 변경되었습니다.");
+        } else {
+            return ResponseEntity.status(404).body("크론 표현식을 변경할 대상 Trigger/Job을 찾을 수 없습니다.");
+        }
+    }
 
     @PostMapping("/jobs/pause")
     public ResponseEntity<String> pauseJob(
             @RequestParam("name") String name,
             @RequestParam("group") String group) {
-        
+
         quartzJobService.pauseJob(name, group);
         return ResponseEntity.ok("선택한 Job 스케줄이 정상적으로 일시 중단(PAUSE)되었습니다.");
     }
@@ -70,7 +86,7 @@ public class QuartzJobController {
     public ResponseEntity<String> resumeJob(
             @RequestParam("name") String name,
             @RequestParam("group") String group) {
-        
+
         quartzJobService.resumeJob(name, group);
         return ResponseEntity.ok("선택한 Job 스케줄이 정상적으로 활성화(RESUME)되었습니다.");
     }
@@ -80,7 +96,7 @@ public class QuartzJobController {
             @RequestParam("name") String name,
             @RequestParam("group") String group,
             @RequestBody(required = false) Map<String, Object> extraParams) {
-        
+
         quartzJobService.triggerJob(name, group, extraParams);
         return ResponseEntity.ok("선택한 Job을 즉시 1회 수동 실행 요청하였습니다.");
     }

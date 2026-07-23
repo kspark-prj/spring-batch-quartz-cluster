@@ -66,7 +66,44 @@
       "response": []
     },
     {
-      "name": "3. 특정 Job 일시 정지 (PAUSE)",
+      "name": "3. 특정 Job Cron 표현식 변경 (UPDATE CRON)",
+      "request": {
+        "method": "PUT",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/api/quartz/jobs/cron?name=DynamicBatchJob-1&group=BATCH_GROUP&cronExpression=0/30 * * * * ?",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "api",
+            "quartz",
+            "jobs",
+            "cron"
+          ],
+          "query": [
+            {
+              "key": "name",
+              "value": "DynamicBatchJob-1"
+            },
+            {
+              "key": "group",
+              "value": "BATCH_GROUP"
+            },
+            {
+              "key": "cronExpression",
+              "value": "0/30 * * * * ?",
+              "description": "변경할 쿼츠 크론 표현식"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "4. 특정 Job 일시 정지 (PAUSE)",
       "request": {
         "method": "POST",
         "header": [],
@@ -98,7 +135,7 @@
       "response": []
     },
     {
-      "name": "4. 일시 정지 상태 해제 (RESUME)",
+      "name": "5. 일시 정지 상태 해제 (RESUME)",
       "request": {
         "method": "POST",
         "header": [],
@@ -130,7 +167,7 @@
       "response": []
     },
     {
-      "name": "5. 특정 Job 스케줄 강제 즉시 실행 (Manual Trigger)",
+      "name": "6. 특정 Job 스케줄 강제 즉시 실행 (Manual Trigger)",
       "request": {
         "method": "POST",
         "header": [
@@ -172,7 +209,7 @@
       "response": []
     },
     {
-      "name": "6. 특정 Job 완전 영구 삭제 (DELETE)",
+      "name": "7. 특정 Job 완전 영구 삭제 (DELETE)",
       "request": {
         "method": "DELETE",
         "header": [],
