@@ -1,0 +1,206 @@
+{
+  "info": {
+    "_postman_id": "7ac9d1e3-c2a0-410a-ba92-a1bcf9c0d123",
+    "name": "Quartz REST API Management Collection",
+    "description": "Clustered Quartz 스케줄러 동적 제어를 위한 API 테스팅 컬렉션",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. 스케줄러 전반 상태 및 등록 Job 목록 조회",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/api/quartz/status",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "api",
+            "quartz",
+            "status"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "2. 동적 Cron Job 추가 등록",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"jobName\": \"DynamicBatchJob-1\",\n    \"jobGroup\": \"BATCH_GROUP\",\n    \"cronExpression\": \"0/15 * * * * ?\",\n    \"jobData\": {\n        \"triggerReason\": \"Manual creation for debug\",\n        \"limitCount\": 5000\n    }\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/api/quartz/jobs?type=BATCH",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "api",
+            "quartz",
+            "jobs"
+          ],
+          "query": [
+            {
+              "key": "type",
+              "value": "BATCH",
+              "description": "BATCH 또는 MONITOR 기동 모드 매핑"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "3. 특정 Job 일시 정지 (PAUSE)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/api/quartz/jobs/pause?name=DefaultSystemMonitoringJob&group=MONITOR_GROUP",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "api",
+            "quartz",
+            "jobs",
+            "pause"
+          ],
+          "query": [
+            {
+              "key": "name",
+              "value": "DefaultSystemMonitoringJob"
+            },
+            {
+              "key": "group",
+              "value": "MONITOR_GROUP"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "4. 일시 정지 상태 해제 (RESUME)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/api/quartz/jobs/resume?name=DefaultSystemMonitoringJob&group=MONITOR_GROUP",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "api",
+            "quartz",
+            "jobs",
+            "resume"
+          ],
+          "query": [
+            {
+              "key": "name",
+              "value": "DefaultSystemMonitoringJob"
+            },
+            {
+              "key": "group",
+              "value": "MONITOR_GROUP"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "5. 특정 Job 스케줄 강제 즉시 실행 (Manual Trigger)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"manualRunBy\": \"Administrator_Dev\",\n    \"bypassValidation\": true\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/api/quartz/jobs/trigger?name=DefaultBatchTriggerJob&group=BATCH_GROUP",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "api",
+            "quartz",
+            "jobs",
+            "trigger"
+          ],
+          "query": [
+            {
+              "key": "name",
+              "value": "DefaultBatchTriggerJob"
+            },
+            {
+              "key": "group",
+              "value": "BATCH_GROUP"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "6. 특정 Job 완전 영구 삭제 (DELETE)",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/api/quartz/jobs?name=DynamicBatchJob-1&group=BATCH_GROUP",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "api",
+            "quartz",
+            "jobs"
+          ],
+          "query": [
+            {
+              "key": "name",
+              "value": "DynamicBatchJob-1"
+            },
+            {
+              "key": "group",
+              "value": "BATCH_GROUP"
+            }
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}

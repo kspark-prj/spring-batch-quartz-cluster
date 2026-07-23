@@ -1,0 +1,64 @@
+spring:
+  application:
+    name: advanced-batch-quartz-service
+
+  # 1. PostgreSQL DB 연결 설정
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://localhost:5432/my-app-db?reWriteBatchedInserts=true
+    username: postgres
+    password: root
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 10
+      pool-name: HikariCP-Main
+
+  # 2. Spring Batch 설정
+  batch:
+    jdbc:
+      initialize-schema: never
+    job:
+      enabled: false
+
+  # 3. Java 21 Virtual Threads 활성화
+  threads:
+    virtual:
+      enabled: true
+
+  # 4. Quartz Cluster Mode 설정
+  quartz:
+    job-store-type: jdbc
+    jdbc:
+      initialize-schema: never
+    properties:
+      org:
+        quartz:
+          scheduler:
+            instanceName: ClusteredQuartzScheduler
+            instanceId: AUTO
+          threadPool:
+            class: org.quartz.simpl.SimpleThreadPool
+            threadCount: 20
+            threadPriority: 5
+          jobStore:
+            # [수정] JobStoreTX 및 dataSource 구문 제거 (Spring이 알아서 LocalDataSourceJobStore 사용)
+            driverDelegateClass: org.quartz.impl.jdbcjobstore.PostgreSQLDelegate
+            tablePrefix: QRTZ_
+            useProperties: false
+            isClustered: true
+            clusterCheckinInterval: 15000
+            misfireThreshold: 60000
+            acquireTriggersWithinLock: true
+
+mybatis:
+  mapper-locations: classpath:mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+    default-executor-type: SIMPLE
+
+logging:
+  level:
+    root: INFO
+    com.example.demo: DEBUG
+    org.springframework.batch: INFO
+    org.quartz: INFO

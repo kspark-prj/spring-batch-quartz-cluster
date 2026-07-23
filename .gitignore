@@ -1,0 +1,38 @@
+# Target 빌드 디렉터리 무시
+target/
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# IntelliJ IDEA 설정 파일 무시
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+# Eclipse 설정 파일 무시
+.settings/
+.classpath
+.project
+.metadata/
+bin/
+tmp/
+
+# VS Code 설정 파일 무시
+.vscode/
+
+# 로그 및 임시 파일 무시
+*.log
+logs/
+temp/
+
+# OS 생성 파일 무시
+.DS_Store
+Thumbs.db
+
+# 애플리케이션 외부 주입용 로컬 환경설정 무시
+.env
+.env.local

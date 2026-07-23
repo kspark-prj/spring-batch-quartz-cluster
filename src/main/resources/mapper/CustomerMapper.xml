@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.demo.mapper.CustomerMapper">
+
+    <select id="selectCustomersByStatus" parameterType="map" resultType="com.example.demo.batch.model.Customer">
+        SELECT
+            id,
+            name,
+            email,
+            status,
+            created_at as createdAt
+        FROM customer
+        WHERE status = #{status}
+        ORDER BY id ASC
+        LIMIT #{_pagesize} OFFSET #{_page} * #{_pagesize}
+    </select>
+
+    <update id="updateStatuses">
+        UPDATE customer
+        SET status = #{status}
+        WHERE id IN
+        <foreach item="item" collection="ids" open="(" separator="," close=")">
+            #{item}
+        </foreach>
+    </update>
+   <update id="updateStatusSingle">
+    UPDATE customer
+    SET status = 'PROCESSED',
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = #{id}
+</update>
+
+
+</mapper>
