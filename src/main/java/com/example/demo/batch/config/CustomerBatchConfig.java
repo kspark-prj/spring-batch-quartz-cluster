@@ -54,7 +54,7 @@ public class CustomerBatchConfig {
     private final ExternalApiSimulator externalApiSimulator;
     private final AsyncTaskExecutor virtualThreadTaskExecutor;
 
-    public CustomerBatchConfig(
+     CustomerBatchConfig(
             JobRepository jobRepository,
             PlatformTransactionManager transactionManager,
             SqlSessionFactory sqlSessionFactory,
@@ -72,14 +72,14 @@ public class CustomerBatchConfig {
     }
 
     @Bean(name = "customerMigrationJob")
-    public Job customerMigrationJob() {
+     Job customerMigrationJob() {
         return new JobBuilder("customerMigrationJob", jobRepository)
                 .start(customerMigrationStep())
                 .build();
     }
 
     @Bean
-    public Step customerMigrationStep() {
+    Step customerMigrationStep() {
         return new StepBuilder("customerMigrationStep", jobRepository)
                 .<Customer, Future<ProcessedCustomer>>chunk(CHUNK_SIZE, transactionManager)
                 .reader(customerItemReader())
@@ -90,7 +90,7 @@ public class CustomerBatchConfig {
 
     @Bean
     @StepScope
-    public MyBatisPagingItemReader<Customer> customerItemReader() {
+    MyBatisPagingItemReader<Customer> customerItemReader() {
         Map<String, Object> parameterValues = new HashMap<>();
         parameterValues.put("status", "PENDING");
 
@@ -104,7 +104,7 @@ public class CustomerBatchConfig {
     }
 
     @Bean
-    public ItemProcessor<Customer, ProcessedCustomer> customerProcessor() {
+     ItemProcessor<Customer, ProcessedCustomer> customerProcessor() {
         return customer -> {
             log.debug("Processing customer: {}", customer.id());
             String apiResult = externalApiSimulator.callExternalValidationApi(customer.id(), customer.email());
@@ -119,7 +119,7 @@ public class CustomerBatchConfig {
     }
 
     @Bean
-    public AsyncItemProcessor<Customer, ProcessedCustomer> asyncCustomerProcessor() {
+     AsyncItemProcessor<Customer, ProcessedCustomer> asyncCustomerProcessor() {
         AsyncItemProcessor<Customer, ProcessedCustomer> asyncProcessor = new AsyncItemProcessor<>();
         asyncProcessor.setDelegate(customerProcessor());
         asyncProcessor.setTaskExecutor(virtualThreadTaskExecutor);
@@ -127,7 +127,7 @@ public class CustomerBatchConfig {
     }
 
     @Bean
-    public ItemWriter<ProcessedCustomer> customerItemWriter() {
+     ItemWriter<ProcessedCustomer> customerItemWriter() {
 
         // =========================================================================
         // 1. Target 테이블(processed_customer) 저장용 MyBatisBatchItemWriter 생성
@@ -189,7 +189,7 @@ public class CustomerBatchConfig {
     }
 
     @Bean
-    public AsyncItemWriter<ProcessedCustomer> asyncCustomerWriter() {
+     AsyncItemWriter<ProcessedCustomer> asyncCustomerWriter() {
         AsyncItemWriter<ProcessedCustomer> asyncWriter = new AsyncItemWriter<>();
         asyncWriter.setDelegate(customerItemWriter());
         return asyncWriter;
@@ -199,21 +199,21 @@ public class CustomerBatchConfig {
     // =========================================================================
 
     @Bean(name = "customerMigrationTaskletJob")
-    public Job customerMigrationTaskletJob() {
+     Job customerMigrationTaskletJob() {
         return new JobBuilder("customerMigrationTaskletJob", jobRepository)
                 .start(customerMigrationTaskletStep())
                 .build();
     }
 
     @Bean
-    public Step customerMigrationTaskletStep() {
+     Step customerMigrationTaskletStep() {
         return new StepBuilder("customerMigrationTaskletStep", jobRepository)
                 .tasklet(customerMigrationTasklet(), transactionManager)
                 .build();
     }
 
     @Bean
-    public Tasklet customerMigrationTasklet() {
+     Tasklet customerMigrationTasklet() {
         return (contribution, chunkContext) -> {
             // 1. PENDING 상태의 전체 데이터 한 번에 조회
             List<Customer> pendingCustomers = customerMapper.selectCustomersByStatusPending();
@@ -222,7 +222,7 @@ public class CustomerBatchConfig {
             if (pendingCustomers.isEmpty()) {
                 return RepeatStatus.FINISHED;
             }
-            pendingCustomers.stream().forEach(s -> System.out.println(s.name()));
+           // pendingCustomers.stream().forEach(s -> System.out.println(s.name()));
 
             log.info("[Tasklet] Successfully processed total {} items.", pendingCustomers.size());
             return RepeatStatus.FINISHED;

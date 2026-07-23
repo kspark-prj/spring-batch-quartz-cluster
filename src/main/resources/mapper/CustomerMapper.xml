@@ -14,7 +14,7 @@
         FROM customer
         WHERE status = #{status}
         ORDER BY id ASC
-        LIMIT #{_pagesize} OFFSET #{_page} * #{_pagesize}
+        LIMIT #{_pagesize} OFFSET 0
     </select>
 
     <update id="updateStatuses">

@@ -1,3 +1,9 @@
+# Eclipse / STS 설정 파일들
+.classpath
+.project
+.settings/
+.factorypath
+
 # Target 빌드 디렉터리 무시
 target/
 *.war
