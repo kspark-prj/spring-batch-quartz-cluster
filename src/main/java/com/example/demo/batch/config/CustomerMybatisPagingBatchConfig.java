@@ -41,9 +41,9 @@ import com.example.demo.support.ExternalApiSimulator;
  * Spring Batch 5.x의 메인 Job/Step 설정 파일입니다.
  */
 @Configuration
-public class CustomerBatchConfig {
+public class CustomerMybatisPagingBatchConfig {
 
-    private static final Logger log = LoggerFactory.getLogger(CustomerBatchConfig.class);
+    private static final Logger log = LoggerFactory.getLogger(CustomerMybatisPagingBatchConfig.class);
     private static final int CHUNK_SIZE = 1000;
 
     private final JobRepository jobRepository;
@@ -52,9 +52,14 @@ public class CustomerBatchConfig {
     private final CustomerMapper customerMapper;
     private final ProcessedCustomerMapper processedCustomerMapper;
     private final ExternalApiSimulator externalApiSimulator;
+
+    // =========================================================================
+    // [MULTITHREAD - 1] 멀티스레드 비동기 처리를 위한 TaskExecutor 주입
+    // Virtual Threads(가상 스레드) 또는 ThreadPoolTaskExecutor를 주입받아 비동기 처리에 활용합니다.
+    // =========================================================================
     private final AsyncTaskExecutor virtualThreadTaskExecutor;
 
-     CustomerBatchConfig(
+     CustomerMybatisPagingBatchConfig(
             JobRepository jobRepository,
             PlatformTransactionManager transactionManager,
             SqlSessionFactory sqlSessionFactory,
@@ -78,13 +83,31 @@ public class CustomerBatchConfig {
                 .build();
     }
 
+    // =========================================================================
+    // [MULTITHREAD - 2] 멀티스레드 구성 전략 선택 (옵션 A vs 옵션 B)
+    //
+    // [옵션 A] AsyncItemProcessor / AsyncItemWriter 방식 (현재 적용 중)
+    //  - Reader는 단일 스레드로 안전하게 읽고, I/O 지연(API 호출 등)이 발생하는 Process 구간만 병렬화합니다.
+    //  - Chunk 결과 제네릭 타입으로 Future<T>를 사용합니다.
+    //
+    // [옵션 B] Multi-threaded Step 방식 (Step 전체 병렬화)
+    //  - Step에 .taskExecutor(virtualThreadTaskExecutor)를 추가하면 Chunk(1,000건) 단위로
+    //    Read -> Process -> Write 전체 과정을 멀티스레드로 동시 실행합니다.
+    //  - MyBatisPagingItemReader는 Thread-safe하므로 옵션 B 적용이 가능합니다.
+    //  - 옵션 B 변경 시 AsyncProcessor/Writer 대신 일반 Processor/Writer를 주입하고,
+    //    Chunk 제네릭도 <Customer, ProcessedCustomer>로 원복해야 합니다.
+    // =========================================================================
     @Bean
     Step customerMigrationStep() {
         return new StepBuilder("customerMigrationStep", jobRepository)
+                // [옵션 A 적용 중] Chunk 제네릭에 Future 반환 타입을 설정
                 .<Customer, Future<ProcessedCustomer>>chunk(CHUNK_SIZE, transactionManager)
                 .reader(customerItemReader())
-                .processor(asyncCustomerProcessor())
-                .writer(asyncCustomerWriter())
+                .processor(asyncCustomerMybatisPagingProcessor()) // Process 비동기 처리
+                .writer(asyncCustomerMybatisPagingWriter())       // Write 비동기 처리
+
+                // [옵션 B로 변경시 주석 해제] Step 단위 전체 멀티스레드 병렬 처리 시 사용
+                // .taskExecutor(virtualThreadTaskExecutor)
                 .build();
     }
 
@@ -99,12 +122,19 @@ public class CustomerBatchConfig {
                 .queryId("com.example.demo.mapper.CustomerMapper.selectCustomersByStatus")
                 .parameterValues(parameterValues)
                 .pageSize(CHUNK_SIZE)
+
+                // =========================================================================
+                // [MULTITHREAD - 3] saveState(false) 필수 설정
+                // - 멀티스레드나 Async 비동기 환경에서는 스레드가 동시 실행되어 상태(읽기 위치)를
+                //   ExecutionContext에 저장 시 경합 및 예외가 발생하므로 false로 오프시킵니다.
+                // - MyBatisPagingItemReader는 Thread-safe하므로 saveState(false)로 안전하게 병렬 처리됩니다.
+                // =========================================================================
                 .saveState(false)
                 .build();
     }
 
     @Bean
-     ItemProcessor<Customer, ProcessedCustomer> customerProcessor() {
+     ItemProcessor<Customer, ProcessedCustomer> customerMybatisPagingProcessor() {
         return customer -> {
             log.debug("Processing customer: {}", customer.id());
             String apiResult = externalApiSimulator.callExternalValidationApi(customer.id(), customer.email());
@@ -118,33 +148,34 @@ public class CustomerBatchConfig {
         };
     }
 
+    // =========================================================================
+    // [MULTITHREAD - 4] AsyncItemProcessor (가공 로직 멀티스레드 수행)
+    // - ItemProcessor의 가공 로직(외부 API 호출)을 TaskExecutor 스레드 풀에 위임하여
+    //   I/O 응답 대기 시간 동안 다른 아이템을 병렬 처리합니다.
+    // =========================================================================
     @Bean
-     AsyncItemProcessor<Customer, ProcessedCustomer> asyncCustomerProcessor() {
+     AsyncItemProcessor<Customer, ProcessedCustomer> asyncCustomerMybatisPagingProcessor() {
         AsyncItemProcessor<Customer, ProcessedCustomer> asyncProcessor = new AsyncItemProcessor<>();
-        asyncProcessor.setDelegate(customerProcessor());
-        asyncProcessor.setTaskExecutor(virtualThreadTaskExecutor);
+        asyncProcessor.setDelegate(customerMybatisPagingProcessor());
+        asyncProcessor.setTaskExecutor(virtualThreadTaskExecutor); // 가상 스레드 Executor 적용
         return asyncProcessor;
     }
 
     @Bean
-     ItemWriter<ProcessedCustomer> customerItemWriter() {
+     ItemWriter<ProcessedCustomer> customerMybatisPagingItemWriter() {
 
         // =========================================================================
         // 1. Target 테이블(processed_customer) 저장용 MyBatisBatchItemWriter 생성
         // =========================================================================
-        // - MyBatisBatchItemWriter는 BATCH ExecutorType 세션을 사용하여
-        //   1,000건의 데이터를 단건 SQL(insertProcessedCustomer)에 addBatch()로 묶어 대량 Insert 합니다.
         MyBatisBatchItemWriter<ProcessedCustomer> processedWriter = new MyBatisBatchItemWriterBuilder<ProcessedCustomer>()
                 .sqlSessionFactory(sqlSessionFactory)
                 .statementId("com.example.demo.mapper.ProcessedCustomerMapper.insertProcessedCustomer")
-                .assertUpdates(false) // Batch 실행 결과 개수 검증 비활성화 (Upsert 사용 시 필요)
+                .assertUpdates(false)
                 .build();
 
         // =========================================================================
         // 2. Source 테이블(customer) 상태 업데이트용 MyBatisBatchItemWriter 생성
         // =========================================================================
-        // - [핵심] 일반 Mapper(customerMapper.updateStatuses)를 직접 부르면 SIMPLE 세션과 충돌(ExecutorType 예외)이 발생합니다.
-        // - 이를 방지하기 위해 Status Update 역시 동일한 BATCH 모드의 Writer로 생성해 세션을 공유합니다.
         MyBatisBatchItemWriter<ProcessedCustomer> statusUpdateWriter = new MyBatisBatchItemWriterBuilder<ProcessedCustomer>()
                 .sqlSessionFactory(sqlSessionFactory)
                 .statementId("com.example.demo.mapper.CustomerMapper.updateStatusSingle")
@@ -154,8 +185,6 @@ public class CustomerBatchConfig {
         // =========================================================================
         // 3. Writer 필수 속성 검증 및 초기화
         // =========================================================================
-        // - Spring Container가 직접 관리하지 않는 객체이므로 afterPropertiesSet()을 직접 호출하여
-        //   sqlSessionFactory, statementId 등의 누락 여부를 실행 전 최종 검증합니다.
         try {
             processedWriter.afterPropertiesSet();
             statusUpdateWriter.afterPropertiesSet();
@@ -167,33 +196,31 @@ public class CustomerBatchConfig {
         // 4. Actual Chunk Write 실행 (람다식)
         // =========================================================================
         return chunk -> {
-            // Chunk<ProcessedCustomer> 내부에서 실제 데이터 리스트(List) 추출
             List<? extends ProcessedCustomer> processedList = chunk.getItems();
 
-            // 처리할 데이터가 없는 빈 청크인 경우 DB 호출 없이 조기 종료
             if (processedList.isEmpty()) {
                 return;
             }
 
             log.info("Writing batch chunk size: {}", processedList.size());
 
-            // [STEP 1] processed_customer 테이블에 대량 Insert / Upsert 실행
-            // - 내부적으로 1,000개 데이터를 루프 돌며 PreparedStatement.addBatch() 후 executeBatch() 1회 호출
             processedWriter.write(chunk);
-
-            // [STEP 2] 원본 customer 테이블의 status를 'PROCESSED'로 대량 Update 실행
-            // - ProcessedCustomer 객체의 'id' 필드를 단건 Update 쿼리(updateStatusSingle)의 #{id}와 매핑
-            // - STEP 1과 동일한 BATCH 세션을 사용하여 ExecutorType 충돌 없이 1회에 일괄 Update 수행
             statusUpdateWriter.write(chunk);
         };
     }
 
+    // =========================================================================
+    // [MULTITHREAD - 5] AsyncItemWriter (비동기 결과 동기화)
+    // - AsyncItemProcessor가 비동기로 반환한 Future 작업 결과들을 동기화(Unwrap)하여
+    //   모든 작업 완료 후 집합(Chunk)으로 단일 ItemWriter로 넘겨 DB 대량 처리합니다.
+    // =========================================================================
     @Bean
-     AsyncItemWriter<ProcessedCustomer> asyncCustomerWriter() {
+     AsyncItemWriter<ProcessedCustomer> asyncCustomerMybatisPagingWriter() {
         AsyncItemWriter<ProcessedCustomer> asyncWriter = new AsyncItemWriter<>();
-        asyncWriter.setDelegate(customerItemWriter());
+        asyncWriter.setDelegate(customerMybatisPagingItemWriter());
         return asyncWriter;
     }
+
     // =========================================================================
     // Tasklet 예제 (한 번에 실행되는 배치)
     // =========================================================================
@@ -222,7 +249,6 @@ public class CustomerBatchConfig {
             if (pendingCustomers.isEmpty()) {
                 return RepeatStatus.FINISHED;
             }
-           // pendingCustomers.stream().forEach(s -> System.out.println(s.name()));
 
             log.info("[Tasklet] Successfully processed total {} items.", pendingCustomers.size());
             return RepeatStatus.FINISHED;

@@ -1,0 +1,104 @@
+
+-- ### 1. 최근 배치 실행 현황 종합 모니터링 (가장 자주 쓰는 쿼리)
+-- 최근 실행된 Job들의 성공/실패 여부, 실행 시간(초), 처리 내역을 한눈에 조회합니다.
+SELECT
+    I.JOB_NAME,
+    E.JOB_EXECUTION_ID,
+    E.STATUS,                  -- COMPLETED, FAILED, STARTED, STARTED 등
+    E.EXIT_CODE,               -- COMPLETED, FAILED 등
+    TO_CHAR(E.START_TIME, 'YYYY-MM-DD HH24:MI:SS') AS START_TIME,
+    TO_CHAR(E.END_TIME, 'YYYY-MM-DD HH24:MI:SS') AS END_TIME,
+    -- 실행 소요 시간 (초 단위)
+    ROUND(EXTRACT(EPOCH FROM (E.END_TIME - E.START_TIME))::numeric, 2) AS DURATION_SECONDS,
+    E.EXIT_MESSAGE             -- 에러 발생 시 요약 메시지
+FROM BATCH_JOB_INSTANCE I
+JOIN BATCH_JOB_EXECUTION E ON I.JOB_INSTANCE_ID = E.JOB_INSTANCE_ID
+ORDER BY E.JOB_EXECUTION_ID DESC
+LIMIT 20;
+
+
+
+--### 2. 실패(FAILED)한 Job 상세 및 예외 스택트레이스 조회
+--실패한 배치가 무엇인지, 어떤 원인으로 에러가 났는지 상세히 확인합니다.
+SELECT
+    I.JOB_NAME,
+    E.JOB_EXECUTION_ID,
+    E.STATUS,
+    TO_CHAR(E.START_TIME, 'YYYY-MM-DD HH24:MI:SS') AS START_TIME,
+    TO_CHAR(E.END_TIME, 'YYYY-MM-DD HH24:MI:SS') AS END_TIME,
+    E.EXIT_CODE,
+    E.EXIT_MESSAGE             -- 상세 에러 로그/스택트레이스
+FROM BATCH_JOB_EXECUTION E
+JOIN BATCH_JOB_INSTANCE I ON E.JOB_INSTANCE_ID = I.JOB_INSTANCE_ID
+WHERE E.STATUS = 'FAILED'
+ORDER BY E.JOB_EXECUTION_ID DESC;
+
+--### 3. Step별 상세 처리 건수 및 병목 구간 모니터링
+--특정 Job 안에서 **어느 Step이 오래 걸렸는지**, 몇 건을 Read/Write 했고 **Skip/Rollback이 몇 건 발생했는지** 모니터링합니다.
+SELECT
+    I.JOB_NAME,
+    E.JOB_EXECUTION_ID,
+    S.STEP_NAME,
+    S.STATUS,
+    -- 처리 건수 모니터링
+    S.READ_COUNT,              -- Read 성공 건수
+    S.WRITE_COUNT,             -- Write 성공 건수
+    S.FILTER_COUNT,            -- Processor에서 null로 필터링된 건수
+    S.READ_SKIP_COUNT,         -- Read 중 Skip 건수
+    S.WRITE_SKIP_COUNT,        -- Write 중 Skip 건수
+    S.PROCESS_SKIP_COUNT,      -- Process 중 Skip 건수
+    S.ROLLBACK_COUNT,          -- 트랜잭션 롤백 횟수
+    -- Step별 실행 시간
+    ROUND(EXTRACT(EPOCH FROM (S.END_TIME - S.START_TIME))::numeric, 2) AS STEP_DURATION_SEC,
+    S.EXIT_MESSAGE
+FROM BATCH_STEP_EXECUTION S
+JOIN BATCH_JOB_EXECUTION E ON S.JOB_EXECUTION_ID = E.JOB_EXECUTION_ID
+JOIN BATCH_JOB_INSTANCE I ON E.JOB_INSTANCE_ID = I.JOB_INSTANCE_ID
+WHERE E.JOB_EXECUTION_ID = :jobExecutionId  -- 특정 JOB_EXECUTION_ID 입력
+ORDER BY S.STEP_EXECUTION_ID ASC;
+
+--### 4. 현재 아직 실행 중(IN_PROGRESS / STARTED)인 배치 조회
+--종료되지 않고 장시간 실행 중이거나 락(Lock)에 걸려 멈춘(Stuck) 배치가 있는지 점검합니다.
+SELECT
+    I.JOB_NAME,
+    E.JOB_EXECUTION_ID,
+    E.STATUS,
+    TO_CHAR(E.START_TIME, 'YYYY-MM-DD HH24:MI:SS') AS START_TIME,
+    -- 현재 시점 기준 경과 시간(분)
+    ROUND(EXTRACT(EPOCH FROM (NOW() - E.START_TIME))::numeric / 60, 1) AS RUNNING_MINUTES
+FROM BATCH_JOB_EXECUTION E
+JOIN BATCH_JOB_INSTANCE I ON E.JOB_INSTANCE_ID = I.JOB_INSTANCE_ID
+WHERE E.STATUS IN ('STARTED', 'STARTING')
+ORDER BY E.START_TIME ASC;
+---
+--### 5. Job 파라미터 확인 (Job Parameter 조회)
+--배치가 어떤 조건/파라미터(예: `date=2026-07-24`, `version=1` 등)로 실행되었는지 확인합니다.
+SELECT
+    E.JOB_EXECUTION_ID,
+    P.KEY_NAME,
+    P.STRING_VAL,
+    P.DATE_VAL,
+    P.LONG_VAL
+FROM BATCH_JOB_EXECUTION_PARAMS P
+JOIN BATCH_JOB_EXECUTION E ON P.JOB_EXECUTION_ID = E.JOB_EXECUTION_ID
+WHERE E.JOB_EXECUTION_ID = :jobExecutionId;
+
+
+--### 6. 일별 Job 실행 성공 / 실패 통계
+--일별 배치 실행 현황과 성공률을 파악할 수 있는 대시보드용 통계 쿼리입니다.
+SELECT
+    TO_CHAR(E.START_TIME, 'YYYY-MM-DD') AS EXEC_DATE,
+    I.JOB_NAME,
+    COUNT(*) AS TOTAL_COUNT,
+    COUNT(CASE WHEN E.STATUS = 'COMPLETED' THEN 1 END) AS SUCCESS_COUNT,
+    COUNT(CASE WHEN E.STATUS = 'FAILED' THEN 1 END) AS FAIL_COUNT,
+    ROUND(AVG(EXTRACT(EPOCH FROM (E.END_TIME - E.START_TIME)))::numeric, 1) AS AVG_DURATION_SEC
+FROM BATCH_JOB_EXECUTION E
+JOIN BATCH_JOB_INSTANCE I ON E.JOB_INSTANCE_ID = I.JOB_INSTANCE_ID
+WHERE E.START_TIME >= NOW() - INTERVAL '30 days'
+GROUP BY TO_CHAR(E.START_TIME, 'YYYY-MM-DD'), I.JOB_NAME
+ORDER BY EXEC_DATE DESC, I.JOB_NAME;
+
+
+
+

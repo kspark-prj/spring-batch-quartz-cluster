@@ -2,10 +2,13 @@ spring:
   application:
     name: advanced-batch-quartz-service
 
-  # 1. PostgreSQL DB 연결 설정
+  # 1. DB 연결 설정
   datasource:
     driver-class-name: org.postgresql.Driver
+    # postgresql
     url: jdbc:postgresql://localhost:5432/my-app-db?reWriteBatchedInserts=true
+    # mysql
+    # url: jdbc:mysql://localhost:3306/my_app_db?useCursorFetch=true&defaultFetchSize=1000&rewriteBatchedStatements=true&allowMultiQueries=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
     username: postgres
     password: root
     hikari:
@@ -13,19 +16,35 @@ spring:
       minimum-idle: 10
       pool-name: HikariCP-Main
 
-  # 2. Spring Batch 설정
+  # 2. [신규 추가] JPA & Hibernate 설정
+  jpa:
+    # DDL 자동 생성 옵션 (validate: DB 엔티티 구조와 Java Entity 매핑 일치 여부만 검증)
+    hibernate:
+      ddl-auto: validate
+    # 실행되는 SQL 쿼리 로그 출력 여부
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true # SQL 줄바꿈 및 정렬
+        # JPA Batch Insert/Update 최적화 (Chunk Size 1000에 맞춤)
+        jdbc:
+          batch_size: 1000
+        order_inserts: true
+        order_updates: true
+
+  # 3. Spring Batch 설정
   batch:
     jdbc:
       initialize-schema: never
     job:
       enabled: false
 
-  # 3. Java 21 Virtual Threads 활성화
+  # 4. Java 21 Virtual Threads 활성화
   threads:
     virtual:
       enabled: true
 
-  # 4. Quartz Cluster Mode 설정
+  # 5. Quartz Cluster Mode 설정
   quartz:
     job-store-type: jdbc
     jdbc:
@@ -41,7 +60,6 @@ spring:
             threadCount: 20
             threadPriority: 5
           jobStore:
-            # [수정] JobStoreTX 및 dataSource 구문 제거 (Spring이 알아서 LocalDataSourceJobStore 사용)
             driverDelegateClass: org.quartz.impl.jdbcjobstore.PostgreSQLDelegate
             tablePrefix: QRTZ_
             useProperties: false
@@ -50,12 +68,14 @@ spring:
             misfireThreshold: 60000
             acquireTriggersWithinLock: true
 
+# MyBatis 설정
 mybatis:
   mapper-locations: classpath:mapper/**/*.xml
   configuration:
     map-underscore-to-camel-case: true
     default-executor-type: SIMPLE
 
+# Logging 설정
 logging:
   level:
     root: INFO

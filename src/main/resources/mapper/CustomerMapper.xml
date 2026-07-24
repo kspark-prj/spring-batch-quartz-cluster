@@ -3,7 +3,7 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="com.example.demo.mapper.CustomerMapper">
-
+	<!-- 1) Paging 전용 쿼리 (MyBatisPagingItemReader용) -->
     <select id="selectCustomersByStatus" parameterType="map" resultType="com.example.demo.batch.model.Customer">
         SELECT
             id,
@@ -16,6 +16,17 @@
         ORDER BY id ASC
         LIMIT #{_pagesize} OFFSET 0
     </select>
+
+    <!-- 2) Cursor 전용 쿼리 (MyBatisCursorItemReader용) -->
+	<select id="selectCustomersByStatusCursor" parameterType="map" resultType="com.example.demo.batch.model.Customer" fetchSize="1000">
+	    SELECT
+	        id, name, email, status, created_at as createdAt
+	    FROM customer
+	    WHERE status = #{status}
+	    ORDER BY id ASC
+	</select>
+
+
 
     <update id="updateStatuses">
         UPDATE customer
@@ -41,5 +52,33 @@
         FROM customer
         where status = 'PENDING'
 	</select>
+
+	<!-- ========================================================================= -->
+    <!-- [Partitioning 전용 쿼리]                                                 -->
+    <!-- ========================================================================= -->
+
+    <!-- [Partitioning 1] 파티션 경계 생성을 위한 최소 ID 조회 -->
+    <select id="selectMinIdByStatus" resultType="long">
+        SELECT COALESCE(MIN(id), 0)
+        FROM customer
+        WHERE status = #{status}
+    </select>
+
+    <!-- [Partitioning 2] 파티션 경계 생성을 위한 최대 ID 조회 -->
+    <select id="selectMaxIdByStatus" resultType="long">
+        SELECT COALESCE(MAX(id), 0)
+        FROM customer
+        WHERE status = #{status}
+    </select>
+
+    <!-- [Partitioning 3] 파티션 Worker가 실행할 PK 범위를 갖는 Paging 쿼리 -->
+    <select id="selectCustomersByStatusAndIdRange" resultType="com.example.demo.batch.model.Customer">
+        SELECT id, name, email, status
+        FROM customer
+        WHERE status = #{status}
+          AND id BETWEEN #{minId} AND #{maxId}
+        ORDER BY id ASC
+        LIMIT #{_skiprows}, #{_pagesize}
+    </select>
 
 </mapper>
