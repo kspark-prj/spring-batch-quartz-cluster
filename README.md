@@ -1,15 +1,16 @@
-# Clustered Quartz & Spring Batch 5.x with Java 21 Virtual Threads
+# Clustered Quartz & Spring Batch 5.x with Java 21 Virtual Threads & Spring Security
 
-이 프로젝트는 Java 21, Spring Boot 3.x, Spring Batch 5.x, Quartz Scheduler (Cluster Mode), MyBatis, PostgreSQL을 활용하여 멀티 노드 환경에서 중복 실행 없이 안전하게 스케줄링을 관리하고, 대용량 처리를 고성능 병렬 방식으로 처리하는 백엔드 아키텍처 실무 예제입니다.
+이 프로젝트는 **Java 21 Virtual Threads**, **Spring Boot 3.x**, **Spring Security**, **Spring Batch 5.x**, **Quartz Scheduler (Cluster Mode)**, **MyBatis**, **Spring Data JPA**, **PostgreSQL**을 활용하여 멀티 노드 환경에서 중복 실행 없이 안전하게 스케줄링을 관리하고, 대용량 처리를 고성능 병렬 방식으로 처리하는 모니터링 대시보드 포함 백엔드 아키텍처 실무 예제입니다.
 
 ---
 
 ## 🛠️ 기술 스택 및 개발 환경
 
 - **Language**: Java 21 (Virtual Threads 적극 활용)
-- **Framework**: Spring Boot 3.2.4, Spring Batch 5.x
+- **Framework**: Spring Boot 3.2.4, Spring Security 6.x, Spring Batch 5.x, Spring Data JPA
 - **Scheduler**: Quartz Scheduler 2.x (Cluster Mode)
-- **Persistence**: MyBatis 3.x, PostgreSQL
+- **Persistence**: MyBatis 3.x, Spring Data JPA, PostgreSQL
+- **Frontend / Dashboard**: HTML5, Vue 3, Tailwind CSS (Glassmorphism), ECharts
 - **DB Tool**: Spring JDBC (`JdbcTemplate` 기반 고속 Bulk Insert)
 
 ---
@@ -17,9 +18,11 @@
 ## 📂 프로젝트 폴더 구조
 
 ```text
-demo
+spring-batch-quartz-cluster
 ├── pom.xml                                         # Maven 의존성 설정 파일
 ├── README.md                                       # 프로젝트 개발/실행 가이드 (본 파일)
+├── batch-monitor.sql                               # Spring Batch 대시보드 쿼리 모음
+├── quartz-monitor.sql                             # Quartz 스케줄러 대시보드 쿼리 모음
 ├── Quartz-Collection.postman_collection.json       # Postman API 호출 테스트용 컬렉션 JSON
 └── src
     └── main
@@ -33,11 +36,13 @@ demo
         │               │   │   └── CustomerBatchConfig.java   # Spring Batch Job 및 TaskExecutor 설정
         │               │   └── model
         │               │       ├── Customer.java              # 소스 테이블 Entity (Record)
+        │               │       ├── JpaCustomer.java           # JPA Customer 엔티티
         │               │       └── ProcessedCustomer.java     # 타겟 테이블 Entity (Record)
         │               ├── config
         │               │   ├── DatabaseConfig.java            # MyBatis 및 트랜잭션 설정
         │               │   ├── QuartzConfig.java              # Quartz 스케줄러 세부 바인딩 설정
-        │               │   └── ThreadConfig.java              # Java 21 가상 스레드 executor 정의
+        │               │   ├── ThreadConfig.java              # Java 21 가상 스레드 executor 정의
+        │               │   └── WebMvcConfig.java              # 정적 뷰 컨트롤러 포워딩/리다이렉트 설정
         │               ├── dummy
         │               │   └── DummyDataGenerator.java        # 10만 건 고속 더미 데이터 생성기
         │               ├── mapper
@@ -47,25 +52,54 @@ demo
         │               │   ├── controller
         │               │   │   └── QuartzJobController.java   # Quartz REST API 웹 컨트롤러
         │               │   ├── dto
+        │               │   │   ├── JobHistoryResponse.java    # 실행 이력 응답 DTO
         │               │   │   ├── JobRequest.java            # Job 등록 파라미터 DTO (Record)
         │               │   │   ├── JobResponse.java           # Job 상태 응답 DTO (Record)
         │               │   │   └── SchedulerStatusResponse.java # 스케줄러 통합 상태 DTO (Record)
         │               │   ├── job
+        │               │   │   ├── CustomerMigrationQuartzJob.java # 고객 마이그레이션 실행 Job
+        │               │   │   ├── ParallelCrawlJob.java      # 병렬 크롤링 작업 Job
         │               │   │   ├── SampleBatchTriggerJob.java # Batch를 구동시키는 Quartz Job
         │               │   │   └── SampleSystemMonitoringJob.java # 시스템 힙 메모리 모니터링 Job
         │               │   └── service
-        │               │       └── QuartzJobService.java      # Quartz API 서비스 레이어
-        │               │   └── util
-        │               │       └── QuartzJobInitializer.java  # 애플리케이션 시작 시 기본 스케줄러 초기화 등록기
+        │               │       ├── QuartzJobService.java      # Quartz API 서비스 레이어
+        │               │       └── WebCrawlerService.java     # 웹 크롤링 서비스
+        │               ├── security
+        │               │   ├── config
+        │               │   │   └── SecurityConfig.java        # Spring Security 6.x 보안 설정
+        │               │   ├── entity
+        │               │   │   └── User.java                  # 사용자 보안 JPA 엔티티 (users 테이블)
+        │               │   ├── init
+        │               │   │   └── DataInitializer.java       # 관리자 계정(admin) 자동검증/생성기
+        │               │   ├── repository
+        │               │   │   └── UserRepository.java        # 사용자 JPA 레포지토리
+        │               │   └── service
+        │               │       └── CustomUserDetailsService.java # UserDetailsService 구현체
         │               └── support
         │                   └── ExternalApiSimulator.java      # 비동기 병렬 대기를 체감할 모의 REST API
         └── resources
-            ├── application.yml                             # 서버 포트, DB, 가상 스레드, Quartz 클러스터링 설정
-            ├── schema-postgresql.sql                       # PostgreSQL용 Quartz 및 비즈니스 테이블 DDL
-            └── mapper
-                ├── CustomerMapper.xml                      # Customer DB 조작 쿼리 XML
-                └── ProcessedCustomerMapper.xml             # ProcessedCustomer DB 조작 쿼리 XML
+            ├── application.yml                             # DB, 가상 스레드, Quartz, JPA 설정
+            ├── schema-postgresql.sql                       # Quartz, Batch, Security, 비즈니스 전체 DDL/DML
+            ├── user-schema.sql                             # Security users 테이블 전용 DDL/DML
+            ├── mapper
+            │   ├── CustomerMapper.xml                      # Customer DB 조작 쿼리 XML
+            │   └── ProcessedCustomerMapper.xml             # ProcessedCustomer DB 조작 쿼리 XML
+            └── static
+                ├── login.html                              # 모던 Glassmorphism 로그인 페이지
+                └── dashboard
+                    └── index.html                          # Vue 3 + Tailwind + ECharts 모니터링 대시보드
 ```
+
+---
+
+## 🔒 보안 및 인증 (Spring Security)
+
+- **보안 접근 제어**: `http://localhost:8080/` 및 `/dashboard/index.html` 접속 시 미인증 사용자는 자동으로 모던 로그인 화면(`login.html`)으로 이동합니다.
+- **비밀번호 암호화**: `BCryptPasswordEncoder` 적용
+- **초기 관리자 계정 정보**:
+  - **아이디**: `admin`
+  - **비밀번호**: `admin1!`
+  - *애플리케이션 구동 시 `DataInitializer`가 DB를 자동 검사하여 계정이 없거나 비밀번호 해시가 일치하지 않을 경우 `admin1!`의 BCrypt 해시로 자동 생성 및 업데이트합니다.*
 
 ---
 
@@ -73,76 +107,58 @@ demo
 
 ### 1. PostgreSQL DB 설정 및 스키마 초기화
 
-- PostgreSQL 데이터베이스에 접속하여 `src/main/resources/schema-postgresql.sql` 파일의 전체 DDL을 실행하여 테이블들을 미리 생성합니다.
-- `src/main/resources/application.yml`의 `spring.datasource` 내에 현재 구동 중인 DB 호스트, 포트, 패스워드를 올바르게 입력합니다.
-    - _참고: 벌크 삽입 성능 향상을 위해 URL 뒤에 `rewriteBatchedStatements=true` 쿼리 파라미터가 추가되어 있습니다._
+1. PostgreSQL 데이터베이스를 구동하고 `src/main/resources/schema-postgresql.sql` (또는 `user-schema.sql`) DDL을 실행합니다.
+2. `src/main/resources/application.yml`의 `spring.datasource` 내에 DB 접속 정보(Host, Port, Username, Password)를 설정합니다.
 
 ### 2. 프로젝트 구동
 
-- IDE(IntelliJ 등)에서 `DemoApplication.java`를 실행하거나 터미널에서 메이븐 명령어로 빌드 후 실행합니다:
-    ```bash
-    mvn spring-boot:run
-    ```
-- 구동 시 최초 1회에 한하여 `customer` 테이블에 10만 건의 PENDING 더미 데이터가 5000개 단위로 나누어 고속 벌크 삽입됩니다.
-- 또한 `DefaultSystemMonitoringJob`(30초 주기), `DefaultBatchTriggerJob`(5분 주기)이 Quartz 스케줄 데이터베이스에 자동 등록되어 활성화됩니다.
+IDE에서 `DemoApplication.java`를 실행하거나 터미널에서 메이븐으로 구동합니다:
+
+```bash
+mvn spring-boot:run
+```
+
+구동 후 웹 브라우저에서 접속합니다:
+- **접속 주소**: `http://localhost:8080` (자동으로 `/login.html`로 이동)
+- **로그인 계정**: `admin` / `admin1!`
 
 ---
 
-## 🔬 핵심 모니터링 및 성능 테스트 방법
+## 🖥️ 주요 화면 및 기능
+
+### 1. 모던 로그인 화면 (`/login.html`)
+- Glassmorphism dark-mode 기반 프리미엄 카드 디자인
+- 비밀번호 보기/숨기기 토글 지원
+- 로그인 실패 및 로그아웃 성공 실시간 알림 뱃지
+
+### 2. Quartz Scheduler 대시보드 (`/dashboard/index.html`)
+- **실시간 요약 카드**: Total, Active, Paused, Error 상태 시각화
+- **ECharts 히트맵**: Apache Airflow Grid View 스타일 실행 상태 매트릭스
+- **Job 제어 기능**: 
+  - 신규 Cron Job 추가
+  - 특정 Job 즉시 실행 (Trigger), 일시 정지 (Pause), 복구 (Resume), 스케줄 변경 (Reschedule), 삭제 (Delete)
+- **자동 새로고침 및 로그아웃**: 5초/10초/30초 설정 및 안전한 세션 종료 로그아웃 지원
+
+---
+
+## 🔬 핵심 테스트 가이드
 
 ### 1. Quartz Cluster Mode (멀티 노드 분산 처리)
 
-1. 두 개의 터미널을 열고 포트를 다르게 하여 프로세스를 각각 구동합니다.
-    - **노드 1**: `java -jar target/demo-0.0.1-SNAPSHOT.jar --server.port=8080`
-    - **노드 2**: `java -jar target/demo-0.0.1-SNAPSHOT.jar --server.port=8081`
-2. 데이터베이스 테이블 `QRTZ_SCHEDULER_STATE`를 조회하면 두 개의 인스턴스가 15초 간격으로 상태를 체킹(Heartbeat)하는 것을 볼 수 있습니다.
-3. 30초 주기로 실행되는 모니터링 Job은 단 하나의 노드 콘솔 로그에서만 출력되며, 두 노드에서 중복 동시 실행되지 않습니다.
-4. 실행 노드를 강제 종료(Kill)하면, 대기하던 노드가 일정 시간 후 이를 감지하고 자동으로 실행 권한을 양도받아 Failover를 정상 처리합니다.
+1. 두 개의 터미널에서 서로 다른 포트로 어플리케이션을 각각 구동합니다.
+   ```bash
+   java -jar target/demo-0.0.1-SNAPSHOT.jar --server.port=8080
+   java -jar target/demo-0.0.1-SNAPSHOT.jar --server.port=8081
+   ```
+2. DB의 `QRTZ_SCHEDULER_STATE` 테이블 조회 시 두 개의 인스턴스가 15초 간격으로 핑(Heartbeat)을 주고받는 것을 확인합니다.
+3. 실행 노드가 중단(Kill)되면 대기 노드가 감지하여 자동으로 권한을 승계(Failover)합니다.
 
 ### 2. Java 21 Virtual Threads 성능 체감
 
-- `ExternalApiSimulator` 클래스는 300~700ms의 네트워크 API 호출 지연을 가상으로 발생시킵니다.
-- `CustomerBatchConfig`에서 **Virtual Thread Executor**를 지정한 `AsyncItemProcessor` 덕분에, 배치 처리 시 I/O 지연이 발생할 때마다 해당 스레드가 물리적으로 차단되지 않고 언마운트되어 수백 개 이상의 REST API 전송을 동시에 기다리게 됩니다.
-- 기존의 스레드 풀 환경 대비 획기적으로 개선된 대용량 처리 시간을 콘솔 모니터링에서 직접 확인하실 수 있습니다.
+- `CustomerBatchConfig`에서 **Virtual Thread Executor**를 적용한 `AsyncItemProcessor`를 통해 I/O 대기 시간 동안 물리 스레드가 차단되지 않고 언마운트되어 수백 개 이상의 REST API 대기를 효율적으로 처리합니다.
 
 ---
 
-## ✉️ RESTful API 컬렉션 테스팅
+## ✉️ RESTful API (Postman Collection)
 
-- 프로젝트 루트 디렉터리에 동봉된 `Quartz-Collection.postman_collection.json` 파일을 복사하여 Postman 웹 또는 데스크톱에서 **Import**한 뒤 즉시 API 관리 기능을 테스트하실 수 있습니다.
-- 제공되는 API 명세:
-    - `스케줄러 상태 및 전체 Job 목록 조회` (GET)
-    - `동적 신규 Cron Job 추가` (POST)
-    - `특정 Job 일시정지 (PAUSE)` (POST)
-    - `정지된 Job 복구 (RESUME)` (POST)
-    - `특정 Job 1회 즉시 실행 (Trigger)` (POST)
-    - `특정 Job 영구 삭제` (DELETE)
-
-Quartz Scheduler Dashboard 구현이 완료되었습니다.
-
-## 생성/수정된 파일 요약
-
-| 파일                         | 상태    | 설명                                       |
-| ---------------------------- | ------- | ------------------------------------------ |
-| **index.html**               | ✨ 신규 | Vue 3 + Tailwind + ECharts 대시보드 (43KB) |
-| **WebConfig.java**           | ✨ 신규 | CORS 허용 + 정적 리소스 핸들러             |
-| **JobHistoryResponse.java**  | ✨ 신규 | 실행 이력 DTO                              |
-| **QuartzJobController.java** | ✏️ 수정 | GET /jobs, GET /history 추가               |
-| **QuartzJobService.java**    | ✏️ 수정 | getJobHistory() 메서드 추가                |
-
-## 접속 방법
-
-Spring Boot 실행 후:
-
-    http://localhost:8080/dashboard/index.html
-
-## 구현된 주요 기능
-
-• 🎨 다크/라이트 테마 토글 (Airflow 다크 테마 기본)
-• 📊 4종 요약 카드 (Total, Active, Paused, Error)
-• 🔥 ECharts 히트맵 (Airflow Grid View 스타일 실행 상태 시각화)
-• 📋 Job 관리 테이블 (정렬, 검색, 상태 뱃지, 행별 액션 버튼)
-• ⏱ 자동 새로고침 (5초/10초/30초 선택)
-• 모달 3종 — 신규 Job 등록, 스케줄 변경 (Cron 프리셋 포함), 삭제 확인
-• 🔔 Toast 알림 (성공/에러/정보, 4초 자동 소멸)
-• 전체 8개 API 연동 (Trigger, Pause, Resume, Reschedule, Add, Delete)
+프로젝트 루트의 `Quartz-Collection.postman_collection.json`을 Postman에 Import하여 API 관리 기능을 직접 테스트할 수 있습니다.

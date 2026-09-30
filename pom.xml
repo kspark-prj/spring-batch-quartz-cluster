@@ -26,6 +26,12 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
+        <!-- Spring Security -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+
         <!-- Spring Batch 5.x -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -97,20 +103,6 @@
 	    <dependency>
 	        <groupId>org.springframework.boot</groupId>
 	        <artifactId>spring-boot-starter-data-jpa</artifactId>
-	    </dependency>
-
-	    <!-- 2. Spring Batch Integration (AsyncItemProcessor, AsyncItemWriter 사용 시 필요) -->
-	    <dependency>
-	        <groupId>org.springframework.batch</groupId>
-	        <artifactId>spring-batch-integration</artifactId>
-	    </dependency>
-
-	    <!-- 3. DB 드라이버 (PostgreSQL / MySQL 중 선택) -->
-	    <!-- PostgreSQL 사용 시 -->
-	    <dependency>
-	        <groupId>org.postgresql</groupId>
-	        <artifactId>postgresql</artifactId>
-	        <scope>runtime</scope>
 	    </dependency>
 
 	    <!-- MySQL 사용 시 (필요한 경우 해제) -->

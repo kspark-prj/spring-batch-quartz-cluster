@@ -259,3 +259,20 @@ CREATE TABLE IF NOT EXISTS processed_customer (
 -- 조회 성능 및 인덱스 (필요 시 처리일시 기준 조회용)
 CREATE INDEX IF NOT EXISTS idx_processed_customer_processed_at ON processed_customer(processed_at);
 
+-- =============================================================================
+-- 4. Security User Schema (users)
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS users (
+    id BIGSERIAL PRIMARY KEY,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    role VARCHAR(50) NOT NULL DEFAULT 'ROLE_ADMIN',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 초기 관리자 계정 생성 (아이디: admin, 비밀번호: admin1!)
+INSERT INTO users (username, password, role, created_at)
+VALUES ('admin', '$2a$10$8.UnVuG9HHgffUDAlk8qfOUVGkqRzgVymGe07xd00DMxs.AQubh4a', 'ROLE_ADMIN', CURRENT_TIMESTAMP)
+ON CONFLICT (username) DO NOTHING;
+
+
