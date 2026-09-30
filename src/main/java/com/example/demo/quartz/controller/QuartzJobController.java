@@ -1,5 +1,6 @@
 package com.example.demo.quartz.controller;
 
+import com.example.demo.quartz.dto.JobHistoryResponse;
 import com.example.demo.quartz.dto.JobRequest;
 import com.example.demo.quartz.dto.SchedulerStatusResponse;
 import com.example.demo.quartz.job.SampleBatchTriggerJob;
@@ -8,6 +9,7 @@ import com.example.demo.quartz.service.QuartzJobService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -26,6 +28,25 @@ public class QuartzJobController {
     @GetMapping("/status")
     public ResponseEntity<SchedulerStatusResponse> getStatus() {
         return ResponseEntity.ok(quartzJobService.getSchedulerStatus());
+    }
+
+    /**
+     * 등록된 모든 Job의 목록 및 상태를 조회합니다.
+     * 프론트엔드 대시보드의 Job 테이블 및 요약 카드에 사용됩니다.
+     */
+    @GetMapping("/jobs")
+    public ResponseEntity<SchedulerStatusResponse> getJobs() {
+        return ResponseEntity.ok(quartzJobService.getSchedulerStatus());
+    }
+
+    /**
+     * Job 실행 이력을 조회합니다.
+     * Airflow 스타일 그리드/히트맵 시각화에 사용됩니다.
+     */
+    @GetMapping("/history")
+    public ResponseEntity<List<JobHistoryResponse>> getHistory(
+            @RequestParam(value = "limit", defaultValue = "100") int limit) {
+        return ResponseEntity.ok(quartzJobService.getJobHistory(limit));
     }
 
     @PostMapping("/jobs")

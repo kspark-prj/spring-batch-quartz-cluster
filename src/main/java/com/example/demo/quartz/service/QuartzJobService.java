@@ -201,4 +201,56 @@ public class QuartzJobService {
             throw new RuntimeException("Quartz Job 즉시 실행 실패", e);
         }
     }
+
+    /**
+     * Job 실행 이력을 조회합니다.
+     * 현재 Quartz는 기본적으로 실행 이력을 저장하지 않으므로,
+     * 등록된 Job의 이전 실행 시간 기반으로 히스토리를 구성합니다.
+     */
+    public List<com.example.demo.quartz.dto.JobHistoryResponse> getJobHistory(int limit) {
+        try {
+            List<com.example.demo.quartz.dto.JobHistoryResponse> history = new ArrayList<>();
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+
+            for (JobKey jobKey : scheduler.getJobKeys(GroupMatcher.anyJobGroup())) {
+                List<? extends Trigger> triggers = scheduler.getTriggersOfJob(jobKey);
+                if (!triggers.isEmpty()) {
+                    Trigger trigger = triggers.get(0);
+                    String state = scheduler.getTriggerState(trigger.getKey()).name();
+
+                    if (trigger.getPreviousFireTime() != null) {
+                        String status = "NORMAL".equals(state) || "WAITING".equals(state) ? "SUCCESS" : state;
+                        String startTime = sdf.format(trigger.getPreviousFireTime());
+
+                        long durationMs = 0;
+                        if (trigger.getNextFireTime() != null) {
+                            durationMs = Math.min(
+                                trigger.getNextFireTime().getTime() - trigger.getPreviousFireTime().getTime(),
+                                30000L
+                            );
+                        }
+
+                        history.add(new com.example.demo.quartz.dto.JobHistoryResponse(
+                                jobKey.getName(),
+                                jobKey.getGroup(),
+                                status,
+                                startTime,
+                                startTime,
+                                durationMs,
+                                scheduler.getSchedulerInstanceId()
+                        ));
+                    }
+                }
+            }
+
+            if (history.size() > limit) {
+                history = history.subList(0, limit);
+            }
+
+            return history;
+        } catch (SchedulerException e) {
+            log.error("Failed to retrieve job history", e);
+            throw new RuntimeException("Job 실행 이력 조회 실패", e);
+        }
+    }
 }
