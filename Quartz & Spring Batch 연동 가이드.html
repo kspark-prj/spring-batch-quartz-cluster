@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quartz + Spring Batch 연동 & JobDataMap 활용 가이드</title>
+    <!-- Tailwind CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Mermaid.js for Sequence Diagram -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            sequence: {
+                diagramMarginX: 30,
+                diagramMarginY: 30,
+                actorMargin: 60,
+                width: 200,         /* 박스 너비 확대로 텍스트 잘림 방지 */
+                height: 70,         /* 박스 높이 확대 */
+                boxMargin: 15,
+                boxTextMargin: 10,
+                noteMargin: 15,
+                messageMargin: 45,  /* 메시지 간격 확보 */
+                mirrorActors: true, /* 하단에도 액터 상자 표시 */
+                useMaxWidth: false  /* 비율 자동 축소 방지 */
+            }
+        });
+    </script>
+    <style>
+        pre code {
+            font-family: 'Fira Code', 'Courier New', Courier, monospace;
+            font-size: 0.875rem;
+        }
+        
+        /* Mermaid 시퀀스 다이어그램 크기 & 가독성 최적화 CSS */
+        .mermaid svg {
+            min-width: 950px !important; /* 다이어그램 최소 너비 강제 확보 */
+            width: 100% !important;
+            height: auto !important;
+            font-size: 15px !important;
+        }
+        .mermaid .actor {
+            font-size: 15px !important;
+            font-weight: bold !important;
+        }
+        .mermaid .messageText {
+            font-size: 14px !important;
+            font-weight: 600 !important;
+            fill: #0f172a !important; /* 선명한 고대비 텍스트 */
+        }
+        .mermaid .noteText {
+            font-size: 13px !important;
+            font-weight: 500 !important;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 leading-relaxed font-sans">
+
+    <!-- Header Section -->
+    <header class="bg-indigo-900 text-white py-10 px-6 shadow-md mb-8">
+        <div class="max-w-6xl mx-auto">
+            <span class="bg-indigo-700 text-indigo-200 text-xs font-semibold px-2.5 py-1 rounded uppercase tracking-wider">Education Guide</span>
+            <h1 class="text-3xl md:text-4xl font-extrabold mt-3 mb-2">Quartz & Spring Batch 연동 가이드</h1>
+            <p class="text-indigo-200 text-lg">JobDataMap을 활용한 파라미터 동적 전달 및 Chunk 기반 배치 실습</p>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-6 space-y-12 pb-16">
+
+        <!-- Section 1: Overview & Concept -->
+        <section class="bg-white p-8 rounded-xl shadow-sm border border-slate-200">
+            <h2 class="text-2xl font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <span class="bg-indigo-100 text-indigo-800 text-sm w-7 h-7 rounded-full flex items-center justify-center font-black">1</span>
+                핵심 개념: Quartz vs Spring Batch
+            </h2>
+            <p class="mb-4 text-slate-600">
+                초보 개발자가 가장 흔히 하는 실수 중 하나는 **Quartz의 Job**과 **Spring Batch의 Job**을 동일시하는 것입니다. 두 프레임워크는 역할이 명확히 나뉩니다.
+            </p>
+            
+            <div class="grid md:grid-cols-2 gap-6 my-6">
+                <div class="p-5 bg-indigo-50/50 rounded-lg border border-indigo-100">
+                    <h3 class="font-bold text-indigo-900 text-lg mb-2">⏱️ Quartz Scheduler</h3>
+                    <ul class="text-sm space-y-2 text-slate-700">
+                        <li>• <strong>역할:</strong> 정해진 시간/주기(Cron)에 작업을 <strong>스케줄링 및 트리거ing</strong></li>
+                        <li>• <strong>주요 객체:</strong> <code class="bg-white px-1 py-0.5 rounded border">JobDetail</code>, <code class="bg-white px-1 py-0.5 rounded border">Trigger</code>, <code class="bg-white px-1 py-0.5 rounded border">JobDataMap</code></li>
+                        <li>• <strong>비유:</strong> 정해진 시간에 알람을 울려 일괄 작업을 시작시키는 <strong>"타이머"</strong></li>
+                    </ul>
+                </div>
+
+                <div class="p-5 bg-emerald-50/50 rounded-lg border border-emerald-100">
+                    <h3 class="font-bold text-emerald-900 text-lg mb-2">⚙️️ Spring Batch</h3>
+                    <ul class="text-sm space-y-2 text-slate-700">
+                        <li>• <strong>역할:</strong> 대용량 데이터를 안전하고 효율적으로 <strong>읽고, 가공하고, 저장</strong></li>
+                        <li>• <strong>주요 객체:</strong> <code class="bg-white px-1 py-0.5 rounded border">Job</code>, <code class="bg-white px-1 py-0.5 rounded border">Step</code>, <code class="bg-white px-1 py-0.5 rounded border">ItemReader/Processor/Writer</code></li>
+                        <li>• <strong>비유:</strong> 공장 라인처럼 부품을 대량으로 가공·포장하는 <strong>"대용량 처리 엔진"</strong></li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Sequence Diagram -->
+        <section class="bg-white p-8 rounded-xl shadow-sm border border-slate-200">
+            <h2 class="text-2xl font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <span class="bg-indigo-100 text-indigo-800 text-sm w-7 h-7 rounded-full flex items-center justify-center font-black">2</span>
+                전체 실행 흐름 (시퀀스 다이어그램)
+            </h2>
+            <p class="mb-6 text-slate-600">
+                Quartz 스케줄러가 실행되어 데이터(JobDataMap)가 Spring Batch의 파라미터(JobParameters)로 전환되고, 최종적으로 Chunk 단위로 처리되는 전체 데이터 흐름입니다.
+            </p>
+
+            <div class="bg-slate-50 p-6 rounded-lg border border-slate-200 overflow-x-auto">
+                <div class="mermaid flex justify-center py-4">
+sequenceDiagram
+    autonumber
+    actor Trigger as ⏱️ Quartz Trigger
+    participant QLauncher as 🚀 QuartzBatchJobLauncher
+    participant Context as 🧩 ApplicationContext
+    participant BLauncher as ⚡ JobLauncher (Spring Batch)
+    participant BatchJob as 📦 Spring Batch Job
+    participant ChunkStep as 🔄 Step (Chunk 100)
+
+    Trigger->>QLauncher: 1. executeInternal(JobExecutionContext) 호출
+    activate QLauncher
+    QLauncher->>QLauncher: 2. context.getMergedJobDataMap() 추출
+    QLauncher->>Context: 3. getBean(targetBatchJobName) 대상 Batch Job 조회
+    Context-->>QLauncher: Batch Job 반환 (userPointRewardJob)
+    QLauncher->>QLauncher: 4. JobDataMap -> JobParameters 변환 (+ run.id)
+    QLauncher->>BLauncher: 5. jobLauncher.run(batchJob, jobParameters)
+    activate BLauncher
+    BLauncher->>BatchJob: 6. Batch Job 실행 요청
+    activate BatchJob
+    BatchJob->>ChunkStep: 7. Step 실행 (ItemReader -> Processor -> Writer)
+    activate ChunkStep
+    Note over ChunkStep: @Value("#{jobParameters[...]}")<br/>파라미터 주입 받아 100개씩 반복 처리
+    ChunkStep-->>BatchJob: Step 완료
+    deactivate ChunkStep
+    BatchJob-->>BLauncher: JobExecution (Status: COMPLETED)
+    deactivate BatchJob
+    BLauncher-->>QLauncher: Return JobExecution Result
+    deactivate BLauncher
+    deactivate QLauncher
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 3: Data Mapping Pipeline -->
+        <section class="bg-white p-8 rounded-xl shadow-sm border border-slate-200">
+            <h2 class="text-2xl font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <span class="bg-indigo-100 text-indigo-800 text-sm w-7 h-7 rounded-full flex items-center justify-center font-black">3</span>
+                JobDataMap ➔ JobParameters 데이터 파이프라인
+            </h2>
+            <p class="text-slate-600 mb-6">
+                Quartz의 <code class="text-indigo-600 font-semibold">JobDataMap</code> 데이터를 Spring Batch 로직 내부로 가져오는 3단계 파이프라인 매핑 규칙입니다.
+            </p>
+
+            <div class="space-y-4">
+                <div class="flex items-start gap-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                    <span class="bg-indigo-600 text-white text-xs font-bold px-2 py-1 rounded uppercase">Step 1</span>
+                    <div>
+                        <h4 class="font-bold text-slate-900">Quartz JobDetail 정의시 데이터 등록</h4>
+                        <p class="text-sm text-slate-600">Quartz 설정 시 <code class="bg-slate-200 text-slate-800 px-1 rounded">.usingJobData("key", value)</code> 형태로 데이터를 설정합니다.</p>
+                    </div>
+                </div>
+
+                <div class="flex items-start gap-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                    <span class="bg-indigo-600 text-white text-xs font-bold px-2 py-1 rounded uppercase">Step 2</span>
+                    <div>
+                        <h4 class="font-bold text-slate-900">공통 Launcher에서 JobParameters로 변환</h4>
+                        <p class="text-sm text-slate-600"><code class="bg-slate-200 text-slate-800 px-1 rounded">JobParametersBuilder</code>를 사용해 Batch 규격 타입으로 세팅하고, 중복 실행 방지를 위해 <code class="bg-slate-200 text-slate-800 px-1 rounded">run.id</code>를 추가합니다.</p>
+                    </div>
+                </div>
+
+                <div class="flex items-start gap-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                    <span class="bg-indigo-600 text-white text-xs font-bold px-2 py-1 rounded uppercase">Step 3</span>
+                    <div>
+                        <h4 class="font-bold text-slate-900">@StepScope와 SpEL을 이용한 Bean 주입</h4>
+                        <p class="text-sm text-slate-600">Batch Component 생성 시 <code class="text-indigo-600 font-semibold">@StepScope</code>를 명시하고 <code class="bg-slate-200 text-slate-800 px-1 rounded">@Value("#{jobParameters['key']}")</code>로 읽어옵니다.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 4: Full Source Code -->
+        <section class="bg-white p-8 rounded-xl shadow-sm border border-slate-200 space-y-8">
+            <h2 class="text-2xl font-bold text-slate-900 mb-2 flex items-center gap-2">
+                <span class="bg-indigo-100 text-indigo-800 text-sm w-7 h-7 rounded-full flex items-center justify-center font-black">4</span>
+                전체 실습 코드
+            </h2>
+            
+            <!-- Code Block 1: Entity -->
+            <div>
+                <h3 class="text-lg font-bold text-slate-800 mb-2 flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-indigo-500"></span> 1. Domain Entity (User.java)
+                </h3>
+                <div class="bg-slate-900 text-slate-100 p-4 rounded-lg overflow-x-auto">
+<pre><code>package com.example.batch.domain;
+
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Getter @Setter
+@NoArgsConstructor
+@AllArgsConstructor
+public class User {
+    private Long id;
+    private String name;
+    private String status;  // PENDING, ACTIVE 등
+    private Integer point;
+}</code></pre>
+                </div>
+            </div>
+
+            <!-- Code Block 2: Batch Config -->
+            <div>
+                <h3 class="text-lg font-bold text-slate-800 mb-2 flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-indigo-500"></span> 2. Spring Batch Chunk Configuration (ChunkBatchConfig.java)
+                </h3>
+                <div class="bg-slate-900 text-slate-100 p-4 rounded-lg overflow-x-auto">
+<pre><code>package com.example.batch.config;
+
+import com.example.batch.domain.User;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.batch.core.Job;
+import org.springframework.batch.core.Step;
+import org.springframework.batch.core.configuration.annotation.StepScope;
+import org.springframework.batch.core.job.builder.JobBuilder;
+import org.springframework.batch.core.repository.JobRepository;
+import org.springframework.batch.core.step.builder.StepBuilder;
+import org.springframework.batch.item.ItemProcessor;
+import org.springframework.batch.item.database.JdbcBatchItemWriter;
+import org.springframework.batch.item.database.JdbcPagingItemReader;
+import org.springframework.batch.item.database.Order;
+import org.springframework.batch.item.database.builder.JdbcBatchItemWriterBuilder;
+import org.springframework.batch.item.database.builder.JdbcPagingItemReaderBuilder;
+import org.springframework.batch.item.database.support.SqlPagingQueryProviderFactoryBean;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.jdbc.core.BeanPropertyRowMapper;
+import org.springframework.transaction.PlatformTransactionManager;
+
+import javax.sql.DataSource;
+import java.util.HashMap;
+import java.util.Map;
+
+@Slf4j
+@Configuration
+@RequiredArgsConstructor
+public class ChunkBatchConfig {
+
+    private final JobRepository jobRepository;
+    private final PlatformTransactionManager transactionManager;
+    private final DataSource dataSource;
+
+    private static final int CHUNK_SIZE = 100;
+
+    @Bean
+    public Job userPointRewardJob(Step userPointRewardStep) {
+        return new JobBuilder("userPointRewardJob", jobRepository)
+                .start(userPointRewardStep)
+                .build();
+    }
+
+    @Bean
+    public Step userPointRewardStep(JdbcPagingItemReader&lt;User&gt; userReader,
+                                     ItemProcessor&lt;User, User&gt; userProcessor,
+                                     JdbcBatchItemWriter&lt;User&gt; userWriter) {
+        return new StepBuilder("userPointRewardStep", jobRepository)
+                .&lt;User, User&gt;chunk(CHUNK_SIZE, transactionManager)
+                .reader(userReader)
+                .processor(userProcessor)
+                .writer(userWriter)
+                .build();
+    }
+
+    // ★ ItemReader: Quartz JobDataMap -> JobParameters 데이터 주입 및 조건문 적용
+    @Bean
+    @StepScope
+    public JdbcPagingItemReader&lt;User&gt; userReader(
+            @Value("#{jobParameters['targetStatus']}") String targetStatus,
+            @Value("#{jobParameters['minPoint']}") Long minPoint) throws Exception {
+
+        Map&lt;String, Object&gt; parameterValues = new HashMap&lt;&gt;();
+        parameterValues.put("status", targetStatus);
+        parameterValues.put("minPoint", minPoint != null ? minPoint : 0L);
+
+        SqlPagingQueryProviderFactoryBean queryProvider = new SqlPagingQueryProviderFactoryBean();
+        queryProvider.setDataSource(dataSource);
+        queryProvider.setSelectClause("SELECT id, name, status, point");
+        queryProvider.setFromClause("FROM users");
+        queryProvider.setWhereClause("WHERE status = :status AND point &gt;= :minPoint");
+
+        Map&lt;String, Order&gt; sortKeys = new HashMap&lt;&gt;();
+        sortKeys.put("id", Order.ASCENDING);
+        queryProvider.setSortKeys(sortKeys);
+
+        return new JdbcPagingItemReaderBuilder&lt;User&gt;()
+                .name("userReader")
+                .dataSource(dataSource)
+                .pageSize(CHUNK_SIZE)
+                .fetchSize(CHUNK_SIZE)
+                .rowMapper(new BeanPropertyRowMapper&lt;&gt;(User.class))
+                .queryProvider(queryProvider.getObject())
+                .parameterValues(parameterValues)
+                .build();
+    }
+
+    // ★ ItemProcessor: 비즈니스 가공 로직
+    @Bean
+    @StepScope
+    public ItemProcessor&lt;User, User&gt; userProcessor(
+            @Value("#{jobParameters['rewardPoint']}") Long rewardPoint) {
+
+        long addPoint = (rewardPoint != null) ? rewardPoint : 100L;
+
+        return user -&gt; {
+            user.setPoint(user.getPoint() + (int) addPoint);
+            user.setStatus("ACTIVE");
+            return user;
+        };
+    }
+
+    // ★ ItemWriter: 가공 데이터 DB Update
+    @Bean
+    @StepScope
+    public JdbcBatchItemWriter&lt;User&gt; userWriter() {
+        return new JdbcBatchItemWriterBuilder&lt;User&gt;()
+                .dataSource(dataSource)
+                .sql("UPDATE users SET point = :point, status = :status WHERE id = :id")
+                .beanMapped()
+                .build();
+    }
+}</code></pre>
+                </div>
+            </div>
+
+            <!-- Code Block 3: Quartz Launcher -->
+            <div>
+                <h3 class="text-lg font-bold text-slate-800 mb-2 flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-indigo-500"></span> 3. Bridge Launcher (QuartzBatchJobLauncher.java)
+                </h3>
+                <div class="bg-slate-900 text-slate-100 p-4 rounded-lg overflow-x-auto">
+<pre><code>package com.example.batch.quartz;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.quartz.JobDataMap;
+import org.quartz.JobExecutionContext;
+import org.quartz.JobExecutionException;
+import org.springframework.batch.core.Job;
+import org.springframework.batch.core.JobExecution;
+import org.springframework.batch.core.JobParameters;
+import org.springframework.batch.core.JobParametersBuilder;
+import org.springframework.batch.core.launch.JobLauncher;
+import org.springframework.context.ApplicationContext;
+import org.springframework.scheduling.quartz.QuartzJobBean;
+import org.springframework.stereotype.Component;
+
+import java.util.Map;
+
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class QuartzBatchJobLauncher extends QuartzJobBean {
+
+    private final JobLauncher jobLauncher;
+    private final ApplicationContext applicationContext;
+
+    public static final String JOB_NAME_KEY = "targetBatchJobName";
+
+    @Override
+    protected void executeInternal(JobExecutionContext context) throws JobExecutionException {
+        JobDataMap jobDataMap = context.getMergedJobDataMap();
+
+        String targetJobName = jobDataMap.getString(JOB_NAME_KEY);
+        if (targetJobName == null || targetJobName.isBlank()) {
+            throw new JobExecutionException("targetBatchJobName 파라미터가 누락되었습니다.");
+        }
+
+        Job batchJob = applicationContext.getBean(targetJobName, Job.class);
+        JobParameters jobParameters = buildJobParameters(jobDataMap);
+
+        try {
+            JobExecution jobExecution = jobLauncher.run(batchJob, jobParameters);
+            if (jobExecution.getStatus().isUnsuccessful()) {
+                throw new JobExecutionException("Batch 실행 실패 - Status: " + jobExecution.getStatus());
+            }
+        } catch (Exception e) {
+            throw new JobExecutionException(e);
+        }
+    }
+
+    private JobParameters buildJobParameters(JobDataMap dataMap) {
+        JobParametersBuilder builder = new JobParametersBuilder();
+
+        for (Map.Entry&lt;String, Object&gt; entry : dataMap.entrySet()) {
+            String key = entry.getKey();
+            Object value = entry.getValue();
+
+            if (JOB_NAME_KEY.equals(key)) continue;
+
+            if (value instanceof String strVal) {
+                builder.addString(key, strVal);
+            } else if (value instanceof Long longVal) {
+                builder.addLong(key, longVal);
+            } else if (value instanceof Integer intVal) {
+                builder.addLong(key, intVal.longValue());
+            } else if (value instanceof Double doubleVal) {
+                builder.addDouble(key, doubleVal);
+            } else if (value != null) {
+                builder.addString(key, value.toString());
+            }
+        }
+        // 중복 실행 방지 키 (JobInstanceUniqueKey)
+        builder.addLong("run.id", System.currentTimeMillis());
+        return builder.toJobParameters();
+    }
+}</code></pre>
+                </div>
+            </div>
+
+            <!-- Code Block 4: Quartz Config -->
+            <div>
+                <h3 class="text-lg font-bold text-slate-800 mb-2 flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-indigo-500"></span> 4. Quartz Schedule Configuration (QuartzScheduleConfig.java)
+                </h3>
+                <div class="bg-slate-900 text-slate-100 p-4 rounded-lg overflow-x-auto">
+<pre><code>package com.example.batch.quartz;
+
+import org.quartz.*;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class QuartzScheduleConfig {
+
+    @Bean
+    public JobDetail userPointRewardJobDetail() {
+        return JobBuilder.newJob(QuartzBatchJobLauncher.class)
+                .withIdentity("userPointRewardQuartzJob", "USER_GROUP")
+                // Batch Job Bean 이름 매핑
+                .usingJobData(QuartzBatchJobLauncher.JOB_NAME_KEY, "userPointRewardJob")
+                // Batch로 넘길 비즈니스 파라미터 (JobDataMap)
+                .usingJobData("targetStatus", "PENDING")
+                .usingJobData("minPoint", 0L)
+                .usingJobData("rewardPoint", 500L)
+                .storeDurably() // Trigger 독립 운용을 위해 필수 설정
+                .build();
+    }
+
+    @Bean
+    public Trigger userPointRewardTrigger(JobDetail userPointRewardJobDetail) {
+        return TriggerBuilder.newTrigger()
+                .forJob(userPointRewardJobDetail) // 명시적 JobDetail 연결 필수
+                .withIdentity("userPointRewardTrigger", "USER_GROUP")
+                .withSchedule(CronScheduleBuilder.cronSchedule("0 0 * * * ?")) // 매시간 0분 실행
+                .build();
+    }
+}</code></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: DB Persistence & Application Restart Policies (NEW) -->
+        <section class="bg-white p-8 rounded-xl shadow-sm border border-slate-200">
+            <h2 class="text-2xl font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <span class="bg-indigo-100 text-indigo-800 text-sm w-7 h-7 rounded-full flex items-center justify-center font-black">5</span>
+                Quartz 자동 등록 및 서버 재실행 동작 메커니즘
+            </h2>
+
+            <div class="space-y-6">
+                <!-- 5.1 Auto-Configuration -->
+                <div>
+                    <h3 class="font-bold text-slate-800 text-lg mb-2 flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+                        Spring Boot Quartz Auto-Configuration 원리
+                    </h3>
+                    <p class="text-slate-600 text-sm leading-relaxed">
+                        Spring Boot 환경에서는 <code class="bg-slate-100 text-slate-800 px-1.5 py-0.5 rounded font-mono border">QuartzAutoConfiguration</code>에 의해 애플리케이션 스타트업 시 컨테이너 내부의 모든 <code class="bg-slate-100 text-slate-800 px-1.5 py-0.5 rounded font-mono border">JobDetail</code> 및 <code class="bg-slate-100 text-slate-800 px-1.5 py-0.5 rounded font-mono border">Trigger</code> Bean을 자동으로 수집하여 Quartz Scheduler에 등록합니다. 별도의 <code class="text-indigo-600 font-mono">scheduler.scheduleJob(...)</code> 호출 코드를 작성할 필요가 없습니다.
+                    </p>
+                </div>
+
+                <!-- 5.2 Restart Behavior Matrix -->
+                <div>
+                    <h3 class="font-bold text-slate-800 text-lg mb-2 flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+                        서버 재실행 시 JobStore 유형별 동작 방식
+                    </h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm border-collapse border border-slate-200">
+                            <thead>
+                                <tr class="bg-slate-100 text-slate-700">
+                                    <th class="p-3 border border-slate-200">저장소 유형</th>
+                                    <th class="p-3 border border-slate-200">옵션 설정</th>
+                                    <th class="p-3 border border-slate-200">재실행 시 동작 과정</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200 text-slate-600">
+                                <tr>
+                                    <td class="p-3 border border-slate-200 font-semibold text-slate-800">RAMJobStore (메모리)</td>
+                                    <td class="p-3 border border-slate-200 font-mono text-xs">job-store-type: memory</td>
+                                    <td class="p-3 border border-slate-200">서버 종료 시 기존 메모리 데이터 삭제. 재부팅 시 코드의 <code class="bg-slate-100 px-1 rounded">@Bean</code> 설정대로 매번 새롭게 신규 등록.</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-3 border border-slate-200 font-semibold text-slate-800" rowspan="2">JDBCJobStore (DB 저장)</td>
+                                    <td class="p-3 border border-slate-200 font-mono text-xs">overwrite-existing-jobs: false<br/><span class="text-amber-600">(기본값)</span></td>
+                                    <td class="p-3 border border-slate-200">
+                                        DB 테이블(<code class="bg-slate-100 px-1 rounded font-mono text-xs">QRTZ_*</code>)의 기존 데이터를 유지.<br/>
+                                        <span class="text-amber-700 font-medium">⚠️ 주의: Java 소스코드의 Cron이나 JobDataMap을 변경해도 DB 데이터가 업데이트되지 않음.</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="p-3 border border-slate-200 font-mono text-xs text-indigo-600 font-semibold">overwrite-existing-jobs: true<br/>(권장)</td>
+                                    <td class="p-3 border border-slate-200">
+                                        부팅 시 DB 레코드가 있더라도 Java 소스코드의 최신 <code class="bg-slate-100 px-1 rounded">@Bean</code> 데이터로 **자동 UPDATE**. 소스 변경 사항이 즉시 반영됨.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 5.3 Misfire Policy & Recommended YML -->
+                <div class="grid md:grid-cols-2 gap-4 pt-2">
+                    <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                        <h4 class="font-bold text-slate-900 text-sm mb-1">⏱️ Misfire (미실행 작업) 처리 정책</h4>
+                        <p class="text-xs text-slate-600 leading-normal">
+                            서버 다운/재시작 동안 누락된 스케줄은 Quartz의 Default Policy(<code class="font-mono text-slate-800">SMART_POLICY</code>)에 따라 놓친 회차를 모두 건너뛰고 <strong>다음 정시 예약 시점부터 정상 가동</strong>합니다.
+                        </p>
+                    </div>
+
+                    <div class="p-4 bg-slate-900 rounded-lg text-slate-100">
+                        <h4 class="font-bold text-indigo-300 text-sm mb-1">🛠️ 실무 권장 YML 설정</h4>
+                        <pre class="text-xs font-mono"><code>spring:
+  quartz:
+    job-store-type: jdbc
+    overwrite-existing-jobs: true # 코드 변경시 DB 덮어쓰기
+    properties:
+      org.quartz.jobStore.misfireThreshold: 60000</code></pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 6: Troubleshooting Checklist -->
+        <section class="bg-amber-50 p-8 rounded-xl border border-amber-200">
+            <h2 class="text-xl font-bold text-amber-900 mb-3 flex items-center gap-2">
+                ⚠️ 초보 개발자가 자주 겪는 장애 체크리스트
+            </h2>
+            <ul class="space-y-2 text-sm text-amber-800">
+                <li class="flex items-start gap-2">
+                    <span>1.</span>
+                    <span><strong>JobInstanceAlreadyCompleteException 발생:</strong> Spring Batch는 완수한 파라미터 조합으로 재실행이 안 됩니다. Quartz Launcher에서 <code class="bg-amber-100 px-1 rounded">run.id</code>나 타임스탬프 파라미터를 추가해야 합니다.</span>
+                </li>
+                <li class="flex items-start gap-2">
+                    <span>2.</span>
+                    <span><strong>@Value 주입시 파라미터가 null로 들어오는 경우:</strong> Spring Batch 컴포넌트(Reader, Processor 등) 선언부에 <code class="bg-amber-100 px-1 rounded font-semibold">@StepScope</code> 또는 <code class="bg-amber-100 px-1 rounded font-semibold">@JobScope</code>를 누락했는지 확인하세요.</span>
+                </li>
+                <li class="flex items-start gap-2">
+                    <span>3.</span>
+                    <span><strong>JobName을 찾을 수 없음 (NoSuchBeanDefinitionException):</strong> Quartz의 <code class="bg-amber-100 px-1 rounded">usingJobData("targetBatchJobName", "...")</code>에 넘긴 이름이 Spring에 등록된 Batch Job의 <code class="bg-amber-100 px-1 rounded">@Bean</code> 메서드/이름과 일치하는지 확인하세요.</span>
+                </li>
+                <li class="flex items-start gap-2">
+                    <span>4.</span>
+                    <span><strong>코드를 수정해도 DB 기반 Quartz Cron이 바뀌지 않는 경우:</strong> DB에 이전 스케줄 데이터가 남아있어서 발생합니다. <code class="bg-amber-100 px-1 rounded font-semibold">spring.quartz.overwrite-existing-jobs: true</code> 옵션을 yml에 추가하세요.</span>
+                </li>
+            </ul>
+        </section>
+
+    </main>
+
+    <footer class="bg-slate-200 border-t border-slate-300 py-6 text-center text-xs text-slate-600">
+        <p>Quartz & Spring Batch Architecture Educational Material</p>
+    </footer>
+
+</body>
+</html>
