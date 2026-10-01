@@ -8,25 +8,29 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         [v-cloak] { display: none; }
-        @keyframes pulse-blue { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        @keyframes pulse-blue {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
         .animate-pulse-blue { animation: pulse-blue 1.5s ease-in-out infinite; }
         .fade-enter-active, .fade-leave-active { transition: all 0.3s ease; }
         .fade-enter-from, .fade-leave-to { opacity: 0; transform: translateY(-10px); }
-        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+        body { font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif; }
         ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 3px; }
     </style>
     <script>
         tailwind.config = {
             darkMode: 'class',
-            theme: { extend: { colors: { airflow: { dark: '#1a1d23', darker: '#131517', card: '#21252b', border: '#2d3139' } } } }
+            theme: { extend: { colors: { airflow: { dark: '#1a1d23', darker: '#131517', card: '#21252b', border: '#2d3139', accent: '#017cee' } } } }
         };
     </script>
 </head>
 <body class="bg-gray-100 dark:bg-airflow-dark text-gray-900 dark:text-gray-100 transition-colors duration-300">
 
 <div id="app" v-cloak>
-    <!-- TOAST NOTIFICATIONS -->
+    <!-- ===== TOAST NOTIFICATIONS ===== -->
     <div class="fixed top-4 right-4 z-[100] space-y-2 max-w-sm">
         <transition-group name="fade">
             <div v-for="toast in toasts" :key="toast.id"
@@ -41,9 +45,10 @@
         </transition-group>
     </div>
 
-    <!-- HEADER -->
+    <!-- ===== TOP HEADER BAR ===== -->
     <header class="bg-white dark:bg-airflow-darker border-b border-gray-200 dark:border-airflow-border sticky top-0 z-50 shadow-sm">
         <div class="max-w-[1600px] mx-auto px-4 sm:px-6 py-3 flex items-center justify-between flex-wrap gap-3">
+            <!-- Logo & Title -->
             <div class="flex items-center gap-3">
                 <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center">
                     <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -57,128 +62,198 @@
                 </div>
             </div>
 
+            <!-- Controls -->
             <div class="flex items-center gap-2 flex-wrap">
-                <div class="flex items-center gap-1.5 bg-gray-100 dark:bg-airflow-card rounded-lg px-3 py-1.5 text-sm">
+                <!-- Auto Refresh -->
+                <div class="flex items-center gap-1.5 bg-gray-100 dark:bg-airflow-card rounded-lg px-3 py-1.5 text-sm border border-gray-200 dark:border-airflow-border">
                     <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-                    <select v-model="autoRefreshInterval" @change="setupAutoRefresh" class="bg-transparent text-sm outline-none cursor-pointer dark:text-gray-300">
-                        <option value="0">Off</option>
-                        <option value="5000">5s</option>
-                        <option value="10000">10s</option>
-                        <option value="30000">30s</option>
+                    <select v-model="autoRefreshInterval" @change="setupAutoRefresh"
+                            class="bg-transparent text-sm outline-none cursor-pointer dark:text-gray-300">
+                        <option value="0">Auto Refresh: Off</option>
+                        <option value="5000">Auto Refresh: 5s</option>
+                        <option value="10000">Auto Refresh: 10s</option>
+                        <option value="30000">Auto Refresh: 30s</option>
                     </select>
                 </div>
 
-                <button @click="fetchAll" :disabled="loading" class="p-2 rounded-lg bg-gray-100 dark:bg-airflow-card hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors" title="새로고침">
+                <!-- Manual Refresh -->
+                <button @click="fetchAll" :disabled="loading"
+                        class="p-2 rounded-lg bg-gray-100 dark:bg-airflow-card border border-gray-200 dark:border-airflow-border hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                        title="새로고침">
                     <svg :class="['w-4 h-4', loading ? 'animate-spin' : '']" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
                 </button>
 
-                <button @click="toggleTheme" class="p-2 rounded-lg bg-gray-100 dark:bg-airflow-card hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors" title="테마 변경">
+                <!-- Theme Toggle -->
+                <button @click="toggleTheme"
+                        class="p-2 rounded-lg bg-gray-100 dark:bg-airflow-card border border-gray-200 dark:border-airflow-border hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                        title="테마 변경">
                     <svg v-if="isDark" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
                     <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
                 </button>
 
-                <button @click="showAddModal = true" class="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors shadow-sm">
+                <!-- Add Job Button -->
+                <button @click="showAddModal = true"
+                        class="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors shadow-sm">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                     신규 Job 등록
                 </button>
+
+                <!-- Logout Button -->
+                <a href="/logout"
+                   class="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-600/20 hover:bg-red-600/30 text-red-400 hover:text-red-300 text-sm font-medium transition-colors border border-red-500/30"
+                   title="로그아웃">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                    로그아웃
+                </a>
             </div>
         </div>
     </header>
 
     <main class="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 space-y-6">
 
-        <!-- INTERACTIVE SUMMARY CARDS (대시보드 요약 + 필터 기능 통합) -->
-        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-            <div v-for="card in summaryCards" :key="card.key"
-                 @click="selectedStateFilter = card.key"
-                 :class="['rounded-xl p-4 border transition-all duration-200 cursor-pointer select-none',
-                     selectedStateFilter === card.key
-                        ? 'bg-blue-50/80 dark:bg-blue-950/40 border-blue-500 ring-2 ring-blue-500/30'
-                        : 'bg-white dark:bg-airflow-card border-gray-200 dark:border-airflow-border hover:border-gray-400 dark:hover:border-gray-600']">
+        <!-- ===== SUMMARY CARDS ===== -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div v-for="card in summaryCards" :key="card.label"
+                 :class="['rounded-xl p-5 border transition-all duration-300 hover:scale-[1.02] hover:shadow-lg',
+                     'bg-white dark:bg-airflow-card border-gray-200 dark:border-airflow-border']">
                 <div class="flex items-center justify-between">
                     <div>
-                        <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">{{ card.label }}</p>
-                        <p class="text-2xl font-bold" :class="card.color">{{ card.value }}</p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">{{ card.label }}</p>
+                        <p class="text-3xl font-bold" :class="card.color">{{ card.value }}</p>
                     </div>
-                    <div :class="['w-10 h-10 rounded-lg flex items-center justify-center text-xl', card.bg]">
-                        <span v-html="card.icon"></span>
+                    <div :class="['w-12 h-12 rounded-xl flex items-center justify-center', card.bg]">
+                        <span class="text-2xl" v-html="card.icon"></span>
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- MAIN INTEGRATED JOB TABLE -->
+        <!-- ===== JOB MANAGEMENT TABLE (EXPANDED) ===== -->
         <section class="bg-white dark:bg-airflow-card border border-gray-200 dark:border-airflow-border rounded-xl overflow-hidden shadow-sm">
-            <div class="px-5 py-4 border-b border-gray-200 dark:border-airflow-border flex items-center justify-between flex-wrap gap-3">
-                <div class="flex items-center gap-3">
+            <!-- Filter & Search Bar -->
+            <div class="p-5 border-b border-gray-200 dark:border-airflow-border bg-gray-50/50 dark:bg-airflow-darker/30 space-y-4">
+                <div class="flex items-center justify-between flex-wrap gap-3">
                     <h2 class="text-base font-semibold flex items-center gap-2">
                         <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                        Job 관리 목록
+                        Job 관리 테이블
+                        <span class="text-xs text-blue-500 bg-blue-100 dark:bg-blue-900/40 px-2 py-0.5 rounded-full font-medium">전체 {{ jobs.length }}개 중 {{ filteredJobs.length }}개 표시</span>
                     </h2>
-                    <span class="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 font-medium">
-                        총 {{ filteredJobs.length }}건
-                    </span>
-                    <span v-if="selectedStateFilter !== 'ALL'" class="text-xs text-amber-500 flex items-center gap-1">
-                        (필터 적용 중: {{ selectedStateFilter }})
-                        <button @click="selectedStateFilter = 'ALL'" class="underline hover:text-amber-400">초기화</button>
-                    </span>
-                </div>
 
-                <div class="relative">
-                    <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                    <input v-model="searchQuery" type="text" placeholder="Job/Group 검색..."
-                           class="pl-9 pr-4 py-2 rounded-lg bg-gray-100 dark:bg-airflow-dark border border-gray-200 dark:border-airflow-border text-sm outline-none focus:ring-2 focus:ring-blue-500/50 w-64 transition-all">
+                    <!-- Filter Controls -->
+                    <div class="flex items-center gap-3 flex-wrap w-full md:w-auto">
+                        <!-- Group Filter -->
+                        <div class="flex items-center gap-2 text-sm">
+                            <span class="text-xs text-gray-500 font-medium">Group:</span>
+                            <select v-model="filterGroup" class="px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-airflow-dark border border-gray-200 dark:border-airflow-border text-sm outline-none focus:ring-2 focus:ring-blue-500/50">
+                                <option value="">ALL Groups</option>
+                                <option v-for="grp in uniqueGroups" :key="grp" :value="grp">{{ grp }}</option>
+                            </select>
+                        </div>
+
+                        <!-- State Filter -->
+                        <div class="flex items-center gap-2 text-sm">
+                            <span class="text-xs text-gray-500 font-medium">State:</span>
+                            <select v-model="filterState" class="px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-airflow-dark border border-gray-200 dark:border-airflow-border text-sm outline-none focus:ring-2 focus:ring-blue-500/50">
+                                <option value="">ALL States</option>
+                                <option value="NORMAL">NORMAL</option>
+                                <option value="PAUSED">PAUSED</option>
+                                <option value="BLOCKED">BLOCKED</option>
+                                <option value="ERROR">ERROR</option>
+                                <option value="NONE">NONE</option>
+                            </select>
+                        </div>
+
+                        <!-- Keyword Search Input -->
+                        <div class="relative flex-1 md:flex-none">
+                            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            <input v-model="searchQuery" type="text" placeholder="Job Name, Cron 검색..."
+                                   class="pl-9 pr-4 py-1.5 rounded-lg bg-gray-100 dark:bg-airflow-dark border border-gray-200 dark:border-airflow-border text-sm outline-none focus:ring-2 focus:ring-blue-500/50 w-full md:w-64 transition-all">
+                        </div>
+
+                        <!-- Reset Filter Button -->
+                        <button v-if="searchQuery || filterState || filterGroup" @click="resetFilters"
+                                class="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 underline transition-colors">
+                            필터 초기화
+                        </button>
+                    </div>
                 </div>
             </div>
 
+            <!-- Table -->
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead>
-                        <tr class="bg-gray-50 dark:bg-airflow-darker text-left text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-airflow-border">
-                            <th @click="sortBy('jobGroup')" class="px-4 py-3 font-medium cursor-pointer hover:text-blue-400 transition-colors select-none">Group <span v-if="sortKey==='jobGroup'">{{ sortAsc ? '▲' : '▼' }}</span></th>
-                            <th @click="sortBy('jobName')" class="px-4 py-3 font-medium cursor-pointer hover:text-blue-400 transition-colors select-none">Job Name <span v-if="sortKey==='jobName'">{{ sortAsc ? '▲' : '▼' }}</span></th>
-                            <th class="px-4 py-3 font-medium">Description</th>
-                            <th @click="sortBy('cronExpression')" class="px-4 py-3 font-medium cursor-pointer hover:text-blue-400 select-none">Cron</th>
-                            <th class="px-4 py-3 font-medium">Next Fire</th>
-                            <th class="px-4 py-3 font-medium">Prev Fire</th>
-                            <th @click="sortBy('triggerState')" class="px-4 py-3 font-medium cursor-pointer hover:text-blue-400 select-none">State <span v-if="sortKey==='triggerState'">{{ sortAsc ? '▲' : '▼' }}</span></th>
-                            <th class="px-4 py-3 font-medium text-center">Actions</th>
+                        <tr class="bg-gray-100/70 dark:bg-airflow-darker text-left border-b border-gray-200 dark:border-airflow-border">
+                            <th @click="sortBy('jobGroup')" class="px-5 py-3.5 font-semibold cursor-pointer hover:text-blue-400 transition-colors select-none whitespace-nowrap">
+                                Group <span v-if="sortKey==='jobGroup'" class="ml-1 text-blue-500">{{ sortAsc ? '▲' : '▼' }}</span>
+                            </th>
+                            <th @click="sortBy('jobName')" class="px-5 py-3.5 font-semibold cursor-pointer hover:text-blue-400 transition-colors select-none whitespace-nowrap">
+                                Job Name <span v-if="sortKey==='jobName'" class="ml-1 text-blue-500">{{ sortAsc ? '▲' : '▼' }}</span>
+                            </th>
+                            <th class="px-5 py-3.5 font-semibold whitespace-nowrap">Description</th>
+                            <th @click="sortBy('cronExpression')" class="px-5 py-3.5 font-semibold cursor-pointer hover:text-blue-400 transition-colors select-none whitespace-nowrap">
+                                Cron Expression <span v-if="sortKey==='cronExpression'" class="ml-1 text-blue-500">{{ sortAsc ? '▲' : '▼' }}</span>
+                            </th>
+                            <th class="px-5 py-3.5 font-semibold whitespace-nowrap">Next Fire Time</th>
+                            <th class="px-5 py-3.5 font-semibold whitespace-nowrap">Previous Fire Time</th>
+                            <th @click="sortBy('triggerState')" class="px-5 py-3.5 font-semibold cursor-pointer hover:text-blue-400 transition-colors select-none whitespace-nowrap">
+                                State <span v-if="sortKey==='triggerState'" class="ml-1 text-blue-500">{{ sortAsc ? '▲' : '▼' }}</span>
+                            </th>
+                            <th class="px-5 py-3.5 font-semibold whitespace-nowrap text-center">Actions</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody class="divide-y divide-gray-100 dark:divide-airflow-border">
                         <tr v-if="filteredJobs.length === 0">
-                            <td colspan="8" class="px-4 py-12 text-center text-gray-400">조건에 맞는 Job이 존재하지 않습니다.</td>
+                            <td colspan="8" class="px-4 py-16 text-center text-gray-400">
+                                <svg class="w-12 h-12 mx-auto mb-3 opacity-30" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                                <p class="text-base font-medium">검색 조건에 일치하는 Job이 없습니다</p>
+                                <p class="text-xs text-gray-500 mt-1">필터 조건을 변경하거나 새로운 Job을 등록해 보세요.</p>
+                            </td>
                         </tr>
                         <tr v-for="job in filteredJobs" :key="job.jobGroup + '/' + job.jobName"
-                            class="border-b border-gray-100 dark:border-airflow-border/50 hover:bg-gray-50 dark:hover:bg-airflow-darker/50 transition-colors">
-                            <td class="px-4 py-3.5"><span class="px-2 py-0.5 rounded text-xs bg-gray-200 dark:bg-gray-700 font-mono text-gray-700 dark:text-gray-300">{{ job.jobGroup }}</span></td>
-                            <td class="px-4 py-3.5 font-semibold text-gray-900 dark:text-gray-100">{{ job.jobName }}</td>
-                            <td class="px-4 py-3.5 text-gray-500 dark:text-gray-400 max-w-[180px] truncate" :title="job.description">{{ job.description || '-' }}</td>
-                            <td class="px-4 py-3.5 font-mono text-xs text-blue-600 dark:text-blue-400">{{ job.cronExpression }}</td>
-                            <td class="px-4 py-3.5 font-mono text-xs text-blue-600 dark:text-yellow-400">{{ job.nextFireTime || '-' }}</td>
-                            <td class="px-4 py-3.5 text-xs whitespace-nowrap text-gray-500 dark:text-gray-400">{{ job.previousFireTime || '-' }}</td>
-                            <td class="px-4 py-3.5">
-                                <span :class="getStateBadgeClass(job.triggerState)" class="px-2.5 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1.5">
-                                    <span v-if="job.triggerState === 'BLOCKED'" class="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse-blue"></span>
-                                    <span v-if="job.triggerState === 'NORMAL'" class="w-1.5 h-1.5 rounded-full bg-green-400"></span>
+                            class="hover:bg-gray-50 dark:hover:bg-airflow-darker/50 transition-colors">
+                            <td class="px-5 py-4">
+                                <span class="px-2.5 py-1 rounded-md text-xs font-semibold bg-gray-200 dark:bg-gray-700/60 font-mono border border-gray-300 dark:border-gray-600/50">{{ job.jobGroup }}</span>
+                            </td>
+                            <td class="px-5 py-4 font-semibold text-gray-900 dark:text-gray-100">{{ job.jobName }}</td>
+                            <td class="px-5 py-4 text-gray-500 dark:text-gray-400 max-w-[240px] truncate" :title="job.description">{{ job.description || '-' }}</td>
+                            <td class="px-5 py-4 font-mono text-xs text-blue-600 dark:text-blue-400 font-medium">{{ job.cronExpression }}</td>
+                            <td class="px-5 py-4 text-xs whitespace-nowrap text-gray-600 dark:text-gray-300">{{ job.nextFireTime || '-' }}</td>
+                            <td class="px-5 py-4 text-xs whitespace-nowrap text-gray-600 dark:text-gray-300">{{ job.previousFireTime || '-' }}</td>
+                            <td class="px-5 py-4">
+                                <span :class="getStateBadgeClass(job.triggerState)" class="px-3 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 shadow-sm">
+                                    <span v-if="job.triggerState === 'BLOCKED'" class="w-2 h-2 rounded-full bg-blue-400 animate-pulse-blue"></span>
+                                    <span v-else-if="job.triggerState === 'NORMAL'" class="w-2 h-2 rounded-full bg-green-400"></span>
+                                    <span v-else-if="job.triggerState === 'PAUSED'" class="w-2 h-2 rounded-full bg-amber-400"></span>
+                                    <span v-else-if="job.triggerState === 'ERROR'" class="w-2 h-2 rounded-full bg-red-400"></span>
                                     {{ job.triggerState }}
                                 </span>
                             </td>
-                            <td class="px-4 py-3.5">
-                                <div class="flex items-center gap-1 justify-center">
-                                    <button @click="triggerJob(job)" title="즉시 실행" class="p-1.5 rounded-md hover:bg-green-100 dark:hover:bg-green-900/40 text-green-600 dark:text-green-400 transition-colors">
+                            <td class="px-5 py-4">
+                                <div class="flex items-center gap-1.5 justify-center">
+                                    <!-- Trigger -->
+                                    <button @click="triggerJob(job)" title="즉시 실행"
+                                            class="p-2 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/40 text-green-600 dark:text-green-400 transition-colors">
                                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                                     </button>
-                                    <button v-if="job.triggerState === 'NORMAL'" @click="pauseJob(job)" title="일시정지" class="p-1.5 rounded-md hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-600 dark:text-amber-400 transition-colors">
+                                    <!-- Pause (visible when NORMAL) -->
+                                    <button v-if="job.triggerState === 'NORMAL'" @click="pauseJob(job)" title="일시정지"
+                                            class="p-2 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-600 dark:text-amber-400 transition-colors">
                                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
                                     </button>
-                                    <button v-if="job.triggerState === 'PAUSED'" @click="resumeJob(job)" title="재개" class="p-1.5 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-600 dark:text-blue-400 transition-colors">
+                                    <!-- Resume (visible when PAUSED) -->
+                                    <button v-if="job.triggerState === 'PAUSED'" @click="resumeJob(job)" title="재개"
+                                            class="p-2 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-600 dark:text-blue-400 transition-colors">
                                         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                                     </button>
-                                    <button @click="openReschedule(job)" title="스케줄 변경" class="p-1.5 rounded-md hover:bg-purple-100 dark:hover:bg-purple-900/40 text-purple-600 dark:text-purple-400 transition-colors">
+                                    <!-- Edit Cron -->
+                                    <button @click="openReschedule(job)" title="스케줄 변경"
+                                            class="p-2 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/40 text-purple-600 dark:text-purple-400 transition-colors">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                                     </button>
-                                    <button @click="confirmDelete(job)" title="삭제" class="p-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 transition-colors">
+                                    <!-- Delete -->
+                                    <button @click="confirmDelete(job)" title="삭제"
+                                            class="p-2 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 transition-colors">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m5 0V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2"/></svg>
                                     </button>
                                 </div>
@@ -190,99 +265,179 @@
         </section>
     </main>
 
-    <!-- RESCHEDULE MODAL -->
+    <!-- ===== RESCHEDULE MODAL ===== -->
     <div v-if="showRescheduleModal" class="fixed inset-0 z-[60] flex items-center justify-center p-4" @click.self="showRescheduleModal = false">
         <div class="fixed inset-0 bg-black/60 backdrop-blur-sm"></div>
         <div class="relative bg-white dark:bg-airflow-card border border-gray-200 dark:border-airflow-border rounded-2xl shadow-2xl w-full max-w-md p-6 z-10">
-            <h3 class="text-lg font-semibold mb-4">스케줄 변경</h3>
+            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                스케줄 변경
+            </h3>
             <div class="space-y-4">
                 <div>
-                    <label class="block text-sm font-medium mb-1 text-gray-500">Job</label>
+                    <label class="block text-sm font-medium mb-1 text-gray-600 dark:text-gray-400">Job</label>
                     <p class="text-sm font-mono px-3 py-2 rounded-lg bg-gray-100 dark:bg-airflow-dark">{{ rescheduleTarget.jobGroup }} / {{ rescheduleTarget.jobName }}</p>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium mb-1 text-gray-500">새 Cron 표현식</label>
+                    <label class="block text-sm font-medium mb-1 text-gray-600 dark:text-gray-400">현재 Cron</label>
+                    <p class="text-sm font-mono px-3 py-2 rounded-lg bg-gray-100 dark:bg-airflow-dark">{{ rescheduleTarget.cronExpression }}</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-600 dark:text-gray-400">새 Cron 표현식 <span class="text-red-400">*</span></label>
                     <input v-model="newCronExpression" type="text" placeholder="0/30 * * * * ?"
-                           class="w-full px-3 py-2 rounded-lg bg-gray-100 dark:bg-airflow-dark border border-gray-300 dark:border-airflow-border text-sm font-mono outline-none">
+                           class="w-full px-3 py-2 rounded-lg bg-gray-100 dark:bg-airflow-dark border border-gray-300 dark:border-airflow-border text-sm font-mono outline-none focus:ring-2 focus:ring-purple-500/50">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2 text-gray-600 dark:text-gray-400">프리셋</label>
+                    <div class="flex flex-wrap gap-2">
+                        <button v-for="preset in cronPresets" :key="preset.cron" @click="newCronExpression = preset.cron"
+                                class="px-2.5 py-1 text-xs rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors">
+                            {{ preset.label }}
+                        </button>
+                    </div>
                 </div>
             </div>
             <div class="flex justify-end gap-3 mt-6">
-                <button @click="showRescheduleModal = false" class="px-4 py-2 text-sm rounded-lg bg-gray-200 dark:bg-gray-700">취소</button>
-                <button @click="rescheduleJob" :disabled="!newCronExpression" class="px-4 py-2 text-sm rounded-lg bg-purple-600 text-white">적용</button>
+                <button @click="showRescheduleModal = false"
+                        class="px-4 py-2 text-sm rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">취소</button>
+                <button @click="rescheduleJob" :disabled="!newCronExpression.trim()"
+                        class="px-4 py-2 text-sm rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-medium transition-colors disabled:opacity-50">변경 적용</button>
             </div>
         </div>
     </div>
 
-    <!-- ADD JOB MODAL -->
+    <!-- ===== ADD JOB MODAL ===== -->
     <div v-if="showAddModal" class="fixed inset-0 z-[60] flex items-center justify-center p-4" @click.self="showAddModal = false">
         <div class="fixed inset-0 bg-black/60 backdrop-blur-sm"></div>
         <div class="relative bg-white dark:bg-airflow-card border border-gray-200 dark:border-airflow-border rounded-2xl shadow-2xl w-full max-w-lg p-6 z-10">
-            <h3 class="text-lg font-semibold mb-4">신규 Job 등록</h3>
+            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                신규 Job 등록
+            </h3>
             <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-600 dark:text-gray-400">Job Bean Name <span class="text-red-400">*</span></label>
+                    <input v-model="newJob.jobBeanName" type="text" placeholder="예: sampleBatchTriggerJob"
+                           class="w-full px-3 py-2 rounded-lg bg-gray-100 dark:bg-airflow-dark border border-gray-300 dark:border-airflow-border text-sm outline-none focus:ring-2 focus:ring-blue-500/50">
+                </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium mb-1 text-gray-500">Job Name</label>
-                        <input v-model="newJob.jobName" type="text" class="w-full px-3 py-2 rounded-lg bg-gray-100 dark:bg-airflow-dark border text-sm outline-none">
+                        <label class="block text-sm font-medium mb-1 text-gray-600 dark:text-gray-400">Job Name <span class="text-red-400">*</span></label>
+                        <input v-model="newJob.jobName" type="text" placeholder="myJob"
+                               class="w-full px-3 py-2 rounded-lg bg-gray-100 dark:bg-airflow-dark border border-gray-300 dark:border-airflow-border text-sm outline-none focus:ring-2 focus:ring-blue-500/50">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium mb-1 text-gray-500">Job Group</label>
-                        <input v-model="newJob.jobGroup" type="text" class="w-full px-3 py-2 rounded-lg bg-gray-100 dark:bg-airflow-dark border text-sm outline-none">
+                        <label class="block text-sm font-medium mb-1 text-gray-600 dark:text-gray-400">Job Group <span class="text-red-400">*</span></label>
+                        <input v-model="newJob.jobGroup" type="text" placeholder="DEFAULT"
+                               class="w-full px-3 py-2 rounded-lg bg-gray-100 dark:bg-airflow-dark border border-gray-300 dark:border-airflow-border text-sm outline-none focus:ring-2 focus:ring-blue-500/50">
                     </div>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium mb-1 text-gray-500">Cron Expression</label>
-                    <input v-model="newJob.cronExpression" type="text" class="w-full px-3 py-2 rounded-lg bg-gray-100 dark:bg-airflow-dark border text-sm font-mono outline-none">
+                    <label class="block text-sm font-medium mb-1 text-gray-600 dark:text-gray-400">Cron Expression <span class="text-red-400">*</span></label>
+                    <input v-model="newJob.cronExpression" type="text" placeholder="0/30 * * * * ?"
+                           class="w-full px-3 py-2 rounded-lg bg-gray-100 dark:bg-airflow-dark border border-gray-300 dark:border-airflow-border text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500/50">
+                    <div class="flex flex-wrap gap-2 mt-2">
+                        <button v-for="preset in cronPresets" :key="'add-'+preset.cron" @click="newJob.cronExpression = preset.cron"
+                                class="px-2 py-0.5 text-xs rounded bg-gray-200 dark:bg-gray-700 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors">
+                            {{ preset.label }}
+                        </button>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-gray-600 dark:text-gray-400">Job Data (JSON)</label>
+                    <textarea v-model="newJob.jobDataStr" rows="3" placeholder='{"key": "value"}'
+                              class="w-full px-3 py-2 rounded-lg bg-gray-100 dark:bg-airflow-dark border border-gray-300 dark:border-airflow-border text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"></textarea>
                 </div>
             </div>
             <div class="flex justify-end gap-3 mt-6">
-                <button @click="showAddModal = false" class="px-4 py-2 text-sm rounded-lg bg-gray-200 dark:bg-gray-700">취소</button>
-                <button @click="addJob" class="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white">등록</button>
+                <button @click="showAddModal = false"
+                        class="px-4 py-2 text-sm rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">취소</button>
+                <button @click="addJob" :disabled="!isFormValid"
+                        class="px-4 py-2 text-sm rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors disabled:opacity-50">등록</button>
             </div>
         </div>
     </div>
 
-    <!-- DELETE CONFIRM MODAL -->
+    <!-- ===== DELETE CONFIRM MODAL ===== -->
     <div v-if="showDeleteModal" class="fixed inset-0 z-[60] flex items-center justify-center p-4" @click.self="showDeleteModal = false">
         <div class="fixed inset-0 bg-black/60 backdrop-blur-sm"></div>
-        <div class="relative bg-white dark:bg-airflow-card border border-red-300 rounded-2xl shadow-2xl w-full max-w-sm p-6 z-10">
-            <h3 class="text-lg font-semibold mb-2 text-center">Job 삭제 확인</h3>
-            <p class="text-sm text-center text-gray-500 mb-4">{{ deleteTarget.jobName }}을(를) 삭제하시겠습니까?</p>
-            <div class="flex justify-center gap-3">
-                <button @click="showDeleteModal = false" class="px-4 py-2 text-sm rounded-lg bg-gray-200 dark:bg-gray-700">취소</button>
-                <button @click="deleteJob" class="px-4 py-2 text-sm rounded-lg bg-red-600 text-white">삭제</button>
+        <div class="relative bg-white dark:bg-airflow-card border border-red-300 dark:border-red-800 rounded-2xl shadow-2xl w-full max-w-sm p-6 z-10">
+            <div class="text-center">
+                <div class="w-14 h-14 mx-auto mb-4 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                    <svg class="w-7 h-7 text-red-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                </div>
+                <h3 class="text-lg font-semibold mb-2">Job 삭제 확인</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">다음 Job을 삭제하시겠습니까?</p>
+                <p class="font-mono text-sm px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 mt-2">
+                    {{ deleteTarget.jobGroup }} / {{ deleteTarget.jobName }}
+                </p>
+            </div>
+            <div class="flex justify-center gap-3 mt-6">
+                <button @click="showDeleteModal = false"
+                        class="px-5 py-2 text-sm rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">취소</button>
+                <button @click="deleteJob"
+                        class="px-5 py-2 text-sm rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium transition-colors">삭제</button>
             </div>
         </div>
     </div>
+
+    <!-- ===== FOOTER ===== -->
+    <footer class="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 text-center text-xs text-gray-400 dark:text-gray-600">
+        Quartz Scheduler Dashboard · Spring Boot + Vue 3 · Built with ❤️
+    </footer>
 </div>
 
 <script>
-const { createApp, ref, computed, onMounted, onUnmounted } = Vue;
+const { createApp, ref, computed, onMounted, onUnmounted, nextTick } = Vue;
 
 createApp({
     setup() {
+        // ===== STATE =====
         const isDark = ref(true);
         const loading = ref(false);
         const autoRefreshInterval = ref('0');
         let refreshTimer = null;
 
-        const scheduler = ref({ schedulerName: '', schedulerInstanceId: '', isStarted: false });
+        const scheduler = ref({ schedulerName: '', schedulerInstanceId: '', isStarted: false, isInStandbyMode: false });
         const jobs = ref([]);
+
+        // Filter & Sort States
         const searchQuery = ref('');
-        const selectedStateFilter = ref('ALL');
+        const filterState = ref('');
+        const filterGroup = ref('');
         const sortKey = ref('jobGroup');
         const sortAsc = ref(true);
 
         const toasts = ref([]);
         let toastId = 0;
 
+        // Modals
         const showRescheduleModal = ref(false);
         const showAddModal = ref(false);
         const showDeleteModal = ref(false);
         const rescheduleTarget = ref({});
         const deleteTarget = ref({});
         const newCronExpression = ref('');
-        const newJob = ref({ jobName: '', jobGroup: 'DEFAULT', cronExpression: '', type: 'BATCH' });
+        const newJob = ref({ jobBeanName: '', jobName: '', jobGroup: 'DEFAULT', cronExpression: '', jobDataStr: '' });
 
+        const cronPresets = [
+            { label: '매 10초', cron: '0/10 * * * * ?' },
+            { label: '매 30초', cron: '0/30 * * * * ?' },
+            { label: '매 1분', cron: '0 * * * * ?' },
+            { label: '매 5분', cron: '0 0/5 * * * ?' },
+            { label: '매 시간', cron: '0 0 * * * ?' },
+            { label: '매일 자정', cron: '0 0 0 * * ?' },
+        ];
+
+        // ===== VALIDATION COMPUTED =====
+        const isFormValid = computed(() => {
+            return newJob.value.jobBeanName.trim() !== '' &&
+                   newJob.value.jobName.trim() !== '' &&
+                   newJob.value.jobGroup.trim() !== '' &&
+                   newJob.value.cronExpression.trim() !== '';
+        });
+
+        // ===== TOAST =====
         function addToast(type, message) {
             const id = ++toastId;
             toasts.value.push({ id, type, message });
@@ -292,9 +447,9 @@ createApp({
             toasts.value = toasts.value.filter(t => t.id !== id);
         }
 
+        // ===== API CALLS =====
         const API_BASE = '/api/quartz';
 
-        // ===== 통신 방식 수정 (before.html과 동일하게 JSON/Text 분기) =====
         async function apiFetch(url, options = {}) {
             try {
                 const res = await fetch(url, {
@@ -324,147 +479,241 @@ createApp({
             }
         }
 
-        async function fetchAll() {
-            loading.value = true;
+        async function fetchJobs() {
             try {
                 const data = await apiFetch(`${API_BASE}/jobs`);
-                if (data && typeof data === 'object') {
-                    scheduler.value = {
-                        schedulerName: data.schedulerName || '',
-                        schedulerInstanceId: data.schedulerInstanceId || '',
-                        isStarted: data.isStarted || data.started || false
-                    };
-                    jobs.value = data.registeredJobs || [];
-                }
-            } catch (e) {}
+                scheduler.value = {
+                    schedulerName: data.schedulerName || '',
+                    schedulerInstanceId: data.schedulerInstanceId || '',
+                    isStarted: data.isStarted || data.started || false,
+                    isInStandbyMode: data.isInStandbyMode || data.inStandbyMode || false
+                };
+                jobs.value = data.registeredJobs || [];
+            } catch (e) { /* handled in apiFetch */ }
+        }
+
+        async function fetchAll() {
+            loading.value = true;
+            await fetchJobs();
             loading.value = false;
         }
 
         async function triggerJob(job) {
             try {
-                const msg = await apiFetch(`${API_BASE}/jobs/trigger?name=${encodeURIComponent(job.jobName)}&group=${encodeURIComponent(job.jobGroup)}`, { method: 'POST', body: '{}' });
-                addToast('success', `${job.jobName} 실행 요청 완료`);
-                fetchAll();
-            } catch (e) {}
+                await apiFetch(`${API_BASE}/jobs/trigger?name=${encodeURIComponent(job.jobName)}&group=${encodeURIComponent(job.jobGroup)}`, {
+                    method: 'POST', body: '{}'
+                });
+                addToast('success', `${job.jobName} 즉시 실행 요청 완료`);
+                await fetchAll();
+            } catch (e) { /* handled */ }
         }
 
         async function pauseJob(job) {
             try {
-                await apiFetch(`${API_BASE}/jobs/pause?name=${encodeURIComponent(job.jobName)}&group=${encodeURIComponent(job.jobGroup)}`, { method: 'POST' });
-                addToast('success', `${job.jobName} 일시정지`);
-                fetchAll();
-            } catch (e) {}
+                await apiFetch(`${API_BASE}/jobs/pause?name=${encodeURIComponent(job.jobName)}&group=${encodeURIComponent(job.jobGroup)}`, {
+                    method: 'POST'
+                });
+                addToast('success', `${job.jobName} 일시정지 완료`);
+                await fetchAll();
+            } catch (e) { /* handled */ }
         }
 
         async function resumeJob(job) {
             try {
-                await apiFetch(`${API_BASE}/jobs/resume?name=${encodeURIComponent(job.jobName)}&group=${encodeURIComponent(job.jobGroup)}`, { method: 'POST' });
-                addToast('success', `${job.jobName} 재개`);
-                fetchAll();
-            } catch (e) {}
+                await apiFetch(`${API_BASE}/jobs/resume?name=${encodeURIComponent(job.jobName)}&group=${encodeURIComponent(job.jobGroup)}`, {
+                    method: 'POST'
+                });
+                addToast('success', `${job.jobName} 재개 완료`);
+                await fetchAll();
+            } catch (e) { /* handled */ }
         }
 
         async function rescheduleJob() {
+            if (!newCronExpression.value.trim()) {
+                addToast('error', 'Cron 표현식을 입력하세요.');
+                return;
+            }
             try {
                 const t = rescheduleTarget.value;
-                await apiFetch(`${API_BASE}/jobs/cron?name=${encodeURIComponent(t.jobName)}&group=${encodeURIComponent(t.jobGroup)}&cronExpression=${encodeURIComponent(newCronExpression.value)}`, { method: 'PUT' });
-                addToast('success', '스케줄 변경 완료');
+                await apiFetch(`${API_BASE}/jobs/cron?name=${encodeURIComponent(t.jobName)}&group=${encodeURIComponent(t.jobGroup)}&cronExpression=${encodeURIComponent(newCronExpression.value)}`, {
+                    method: 'PUT'
+                });
+                addToast('success', `${t.jobName} 스케줄 변경 완료`);
                 showRescheduleModal.value = false;
-                fetchAll();
-            } catch (e) {}
+                await fetchAll();
+            } catch (e) { /* handled */ }
         }
 
         async function addJob() {
+            if (!newJob.value.jobBeanName.trim()) { addToast('error', 'Job Bean Name을 입력하세요.'); return; }
+            if (!newJob.value.jobName.trim()) { addToast('error', 'Job Name을 입력하세요.'); return; }
+            if (!newJob.value.jobGroup.trim()) { addToast('error', 'Job Group을 입력하세요.'); return; }
+            if (!newJob.value.cronExpression.trim()) { addToast('error', 'Cron Expression을 입력하세요.'); return; }
+
+            let jobData = {};
+            if (newJob.value.jobDataStr.trim()) {
+                try {
+                    jobData = JSON.parse(newJob.value.jobDataStr);
+                } catch {
+                    addToast('error', 'Job Data JSON 형식이 올바르지 않습니다.');
+                    return;
+                }
+            }
+
             try {
-                await apiFetch(`${API_BASE}/jobs?type=${encodeURIComponent(newJob.value.type)}`, {
+                await apiFetch(`${API_BASE}/jobs?jobBeanName=${encodeURIComponent(newJob.value.jobBeanName.trim())}`, {
                     method: 'POST',
-                    body: JSON.stringify(newJob.value)
+                    body: JSON.stringify({
+                        jobName: newJob.value.jobName.trim(),
+                        jobGroup: newJob.value.jobGroup.trim(),
+                        cronExpression: newJob.value.cronExpression.trim(),
+                        jobData
+                    })
                 });
-                addToast('success', 'Job 등록 완료');
+                addToast('success', `${newJob.value.jobName} Job 등록 완료`);
                 showAddModal.value = false;
-                fetchAll();
-            } catch (e) {}
+                newJob.value = { jobBeanName: '', jobName: '', jobGroup: 'DEFAULT', cronExpression: '', jobDataStr: '' };
+                await fetchAll();
+            } catch (e) { /* handled */ }
         }
 
         async function deleteJob() {
             try {
                 const t = deleteTarget.value;
-                await apiFetch(`${API_BASE}/jobs?name=${encodeURIComponent(t.jobName)}&group=${encodeURIComponent(t.jobGroup)}`, { method: 'DELETE' });
-                addToast('success', 'Job 삭제 완료');
+                await apiFetch(`${API_BASE}/jobs?name=${encodeURIComponent(t.jobName)}&group=${encodeURIComponent(t.jobGroup)}`, {
+                    method: 'DELETE'
+                });
+                addToast('success', `${t.jobName} 삭제 완료`);
                 showDeleteModal.value = false;
-                fetchAll();
-            } catch (e) {}
+                await fetchAll();
+            } catch (e) { /* handled */ }
         }
 
-        function openReschedule(job) { rescheduleTarget.value = { ...job }; newCronExpression.value = job.cronExpression; showRescheduleModal.value = true; }
-        function confirmDelete(job) { deleteTarget.value = { ...job }; showDeleteModal.value = true; }
+        // ===== MODAL HELPERS =====
+        function openReschedule(job) {
+            rescheduleTarget.value = { ...job };
+            newCronExpression.value = job.cronExpression;
+            showRescheduleModal.value = true;
+        }
 
+        function confirmDelete(job) {
+            deleteTarget.value = { ...job };
+            showDeleteModal.value = true;
+        }
+
+        // ===== SORTING & FILTERING =====
         function sortBy(key) {
-            if (sortKey.value === key) sortAsc.value = !sortAsc.value;
+            if (sortKey.value === key) { sortAsc.value = !sortAsc.value; }
             else { sortKey.value = key; sortAsc.value = true; }
         }
+
+        function resetFilters() {
+            searchQuery.value = '';
+            filterState.value = '';
+            filterGroup.value = '';
+        }
+
+        const uniqueGroups = computed(() => {
+            const groups = jobs.value.map(j => j.jobGroup).filter(Boolean);
+            return [...new Set(groups)].sort();
+        });
 
         const filteredJobs = computed(() => {
             let list = [...jobs.value];
 
-            // 상태 카드 필터 적용
-            if (selectedStateFilter.value !== 'ALL') {
-                list = list.filter(j => j.triggerState === selectedStateFilter.value);
+            // 1. Group Filter
+            if (filterGroup.value) {
+                list = list.filter(j => j.jobGroup === filterGroup.value);
             }
 
-            // 검색어 필터 적용
-            const q = searchQuery.value.toLowerCase();
-            if (q) list = list.filter(j => j.jobName.toLowerCase().includes(q) || j.jobGroup.toLowerCase().includes(q));
+            // 2. State Filter
+            if (filterState.value) {
+                list = list.filter(j => j.triggerState === filterState.value);
+            }
 
-            // 정렬
+            // 3. Keyword Search
+            const q = searchQuery.value.toLowerCase().trim();
+            if (q) {
+                list = list.filter(j =>
+                    j.jobName.toLowerCase().includes(q) ||
+                    j.jobGroup.toLowerCase().includes(q) ||
+                    (j.description || '').toLowerCase().includes(q) ||
+                    (j.cronExpression || '').toLowerCase().includes(q)
+                );
+            }
+
+            // 4. Sorting
             list.sort((a, b) => {
                 const va = (a[sortKey.value] || '').toLowerCase();
                 const vb = (b[sortKey.value] || '').toLowerCase();
                 return sortAsc.value ? va.localeCompare(vb) : vb.localeCompare(va);
             });
+
             return list;
         });
 
+        // ===== SUMMARY CARDS =====
         const summaryCards = computed(() => {
             const all = jobs.value;
+            const total = all.length;
+            const running = all.filter(j => j.triggerState === 'BLOCKED' || j.triggerState === 'NORMAL').length;
+            const paused = all.filter(j => j.triggerState === 'PAUSED').length;
+            const error = all.filter(j => j.triggerState === 'ERROR').length;
             return [
-                { key: 'ALL', label: '전체 Jobs', value: all.length, icon: '📋', color: 'text-gray-900 dark:text-gray-100', bg: 'bg-gray-100 dark:bg-gray-800' },
-                { key: 'NORMAL', label: '정상 대기 (NORMAL)', value: all.filter(j => j.triggerState === 'NORMAL').length, icon: '🟢', color: 'text-green-500', bg: 'bg-green-100 dark:bg-green-900/30' },
-                { key: 'BLOCKED', label: '실행 중 (BLOCKED)', value: all.filter(j => j.triggerState === 'BLOCKED').length, icon: '⚡', color: 'text-blue-500', bg: 'bg-blue-100 dark:bg-blue-900/30' },
-                { key: 'PAUSED', label: '일시정지 (PAUSED)', value: all.filter(j => j.triggerState === 'PAUSED').length, icon: '⏸️', color: 'text-amber-500', bg: 'bg-amber-100 dark:bg-amber-900/30' },
-                { key: 'ERROR', label: '오류 (ERROR)', value: all.filter(j => j.triggerState === 'ERROR').length, icon: '🚨', color: 'text-red-500', bg: 'bg-red-100 dark:bg-red-900/30' },
+                { label: 'Total Jobs', value: total, icon: '📋', color: 'text-blue-500', bg: 'bg-blue-100 dark:bg-blue-900/30' },
+                { label: 'Active Jobs', value: running, icon: '⚡', color: 'text-green-500', bg: 'bg-green-100 dark:bg-green-900/30' },
+                { label: 'Paused Jobs', value: paused, icon: '⏸️', color: 'text-amber-500', bg: 'bg-amber-100 dark:bg-amber-900/30' },
+                { label: 'Error Jobs', value: error, icon: '🚨', color: 'text-red-500', bg: 'bg-red-100 dark:bg-red-900/30' },
             ];
         });
 
+        // ===== STATE BADGE =====
         function getStateBadgeClass(state) {
             const map = {
-                NORMAL: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300',
-                PAUSED: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
-                BLOCKED: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
-                ERROR: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
+                NORMAL:  'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-800',
+                PAUSED:  'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800',
+                BLOCKED: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-800',
+                ERROR:   'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-800',
+                NONE:    'bg-gray-100 dark:bg-gray-700/40 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600',
             };
-            return map[state] || 'bg-gray-100 dark:bg-gray-700/40 text-gray-600';
+            return map[state] || map.NONE;
         }
 
+        // ===== THEME =====
         function toggleTheme() {
             isDark.value = !isDark.value;
             document.documentElement.classList.toggle('dark', isDark.value);
+            localStorage.setItem('quartz-dashboard-theme', isDark.value ? 'dark' : 'light');
         }
 
+        // ===== AUTO REFRESH =====
         function setupAutoRefresh() {
-            if (refreshTimer) clearInterval(refreshTimer);
+            if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
             const ms = parseInt(autoRefreshInterval.value);
-            if (ms > 0) refreshTimer = setInterval(fetchAll, ms);
+            if (ms > 0) { refreshTimer = setInterval(fetchAll, ms); }
         }
 
-        onMounted(() => fetchAll());
-        onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer); });
+        // ===== LIFECYCLE =====
+        onMounted(() => {
+            const savedTheme = localStorage.getItem('quartz-dashboard-theme');
+            if (savedTheme === 'light') { isDark.value = false; document.documentElement.classList.remove('dark'); }
+            fetchAll();
+        });
+
+        onUnmounted(() => {
+            if (refreshTimer) clearInterval(refreshTimer);
+        });
 
         return {
-            isDark, loading, autoRefreshInterval, scheduler, jobs, searchQuery, selectedStateFilter, sortKey, sortAsc, toasts,
-            showRescheduleModal, showAddModal, showDeleteModal, rescheduleTarget, deleteTarget, newCronExpression, newJob,
-            summaryCards, filteredJobs, toggleTheme, setupAutoRefresh, fetchAll, triggerJob, pauseJob, resumeJob, rescheduleJob, addJob, deleteJob,
-            openReschedule, confirmDelete, sortBy, getStateBadgeClass, addToast, removeToast
+            isDark, loading, autoRefreshInterval, scheduler, jobs,
+            searchQuery, filterState, filterGroup, sortKey, sortAsc, toasts,
+            showRescheduleModal, showAddModal, showDeleteModal,
+            rescheduleTarget, deleteTarget, newCronExpression, newJob,
+            cronPresets, summaryCards, filteredJobs, uniqueGroups, isFormValid,
+            toggleTheme, setupAutoRefresh, fetchAll, resetFilters,
+            triggerJob, pauseJob, resumeJob, rescheduleJob, addJob, deleteJob,
+            openReschedule, confirmDelete, sortBy, getStateBadgeClass,
+            addToast, removeToast
         };
     }
 }).mount('#app');

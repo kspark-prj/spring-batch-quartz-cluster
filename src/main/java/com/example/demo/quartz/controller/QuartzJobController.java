@@ -1,16 +1,23 @@
 package com.example.demo.quartz.controller;
 
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.context.ApplicationContext;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.example.demo.quartz.dto.JobHistoryResponse;
 import com.example.demo.quartz.dto.JobRequest;
 import com.example.demo.quartz.dto.SchedulerStatusResponse;
-import com.example.demo.quartz.job.SampleBatchTriggerJob;
-import com.example.demo.quartz.job.SampleSystemMonitoringJob;
 import com.example.demo.quartz.service.QuartzJobService;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-import java.util.Map;
 
 /**
  * Quartz 스케줄러 동적 관리를 위한 REST Controller입니다.
@@ -20,9 +27,11 @@ import java.util.Map;
 public class QuartzJobController {
 
     private final QuartzJobService quartzJobService;
+    private final ApplicationContext applicationContext;
 
-    public QuartzJobController(QuartzJobService quartzJobService) {
+    public QuartzJobController(QuartzJobService quartzJobService,ApplicationContext applicationContext) {
         this.quartzJobService = quartzJobService;
+        this.applicationContext = applicationContext;
     }
 
     @GetMapping("/status")
@@ -52,17 +61,21 @@ public class QuartzJobController {
     @PostMapping("/jobs")
     public ResponseEntity<String> createJob(
             @RequestBody JobRequest request,
-            @RequestParam(value = "type", defaultValue = "BATCH") String type) {
+            @RequestParam(value = "jobBeanName") String jobBeanName) { // 예: "sampleBatchTriggerJob"
 
-        Class<? extends org.quartz.Job> targetJobClass =
-                "MONITOR".equalsIgnoreCase(type) ? SampleSystemMonitoringJob.class : SampleBatchTriggerJob.class;
+        // 1. Spring Context에서 빈 이름으로 Class 타입 조회
+        Class<?> beanType = applicationContext.getType(jobBeanName);
 
-        boolean created = quartzJobService.addJob(request, targetJobClass);
-        if (created) {
-            return ResponseEntity.ok("Quartz 스케줄 Job이 성공적으로 등록되었습니다.");
-        } else {
-            return ResponseEntity.badRequest().body("이미 등록된 동일한 이름과 그룹의 Job이 존재합니다.");
+        if (beanType == null || !org.quartz.Job.class.isAssignableFrom(beanType)) {
+            return ResponseEntity.badRequest().body("존재하지 않거나 Quartz Job이 아닌 Bean입니다.");
         }
+
+        @SuppressWarnings("unchecked")
+        Class<? extends org.quartz.Job> targetJobClass = (Class<? extends org.quartz.Job>) beanType;
+
+        // 2. Quartz에 등록
+        boolean created = quartzJobService.addJob(request, targetJobClass);
+        return created ? ResponseEntity.ok("성공") : ResponseEntity.badRequest().body("중복");
     }
 
     @DeleteMapping("/jobs")
