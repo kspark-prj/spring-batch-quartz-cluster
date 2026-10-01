@@ -42,7 +42,8 @@ public class QuartzJobInitializer implements CommandLineRunner {
                     "DefaultSystemMonitoringJob",
                     "MONITOR_GROUP",
                     "0/30 * * * * ?",
-                    Map.of("desc", "System health monitor")
+                    Map.of("desc", "System health monitor"),
+                    "샘플 모니터링 잡"
             );
             quartzJobService.addJob(request, SampleSystemMonitoringJob.class);
             log.info("DefaultSystemMonitoringJob이 정상 등록되었습니다.");
@@ -54,7 +55,8 @@ public class QuartzJobInitializer implements CommandLineRunner {
                     "DefaultBatchTriggerJob",
                     "BATCH_GROUP",
                     "0 0/5 * * * ?",
-                    Map.of("runBy", "System Auto Initializer")
+                    Map.of("runBy", "System Auto Initializer"),
+                    "샘플 배치 실행 잡"
             );
             quartzJobService.addJob(request, SampleBatchTriggerJob.class);
             log.info("DefaultBatchTriggerJob이 정상 등록되었습니다.");
@@ -67,7 +69,8 @@ public class QuartzJobInitializer implements CommandLineRunner {
                     "CustomerMigrationTaskletJob",
                     "BATCH_GROUP",
                     "0 0/2 * * * ?",  // 원하는 Cron 표현식 (예: 2분마다 실행)
-                    Map.of("runBy", "Customer migration tasklet monitor")
+                    Map.of("runBy", "Customer migration tasklet monitor"),
+                    "샘플 스프링배치 잡"
             );
 
             // 위에서 작성한 CustomerMigrationQuartzJob 클래스를 지정합니다.

@@ -9,5 +9,6 @@ public record JobRequest(
     String jobName,
     String jobGroup,
     String cronExpression,
-    Map<String, Object> jobData
+    Map<String, Object> jobData,
+    String desc
 ) {}

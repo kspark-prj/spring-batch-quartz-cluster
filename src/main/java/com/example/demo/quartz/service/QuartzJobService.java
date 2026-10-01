@@ -1,17 +1,32 @@
 package com.example.demo.quartz.service;
 
-import com.example.demo.quartz.dto.JobRequest;
-import com.example.demo.quartz.dto.JobResponse;
-import com.example.demo.quartz.dto.SchedulerStatusResponse;
-import org.quartz.*;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+
+import org.quartz.CronScheduleBuilder;
+import org.quartz.CronTrigger;
+import org.quartz.Job;
+import org.quartz.JobBuilder;
+import org.quartz.JobDataMap;
+import org.quartz.JobDetail;
+import org.quartz.JobKey;
+import org.quartz.Scheduler;
+import org.quartz.SchedulerException;
+import org.quartz.Trigger;
+import org.quartz.TriggerBuilder;
+import org.quartz.TriggerKey;
 import org.quartz.impl.matchers.GroupMatcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.quartz.SchedulerFactoryBean;
 import org.springframework.stereotype.Service;
 
-import java.text.SimpleDateFormat;
-import java.util.*;
+import com.example.demo.quartz.dto.JobRequest;
+import com.example.demo.quartz.dto.JobResponse;
+import com.example.demo.quartz.dto.SchedulerStatusResponse;
 
 /**
  * Quartz Job을 동적으로 조회, 추가, 정지, 재개, 실행 및 삭제하는 비즈니스 로직 서비스입니다.
@@ -97,7 +112,7 @@ public class QuartzJobService {
 
             JobDetail jobDetail = JobBuilder.newJob(jobClass)
                     .withIdentity(jobKey)
-                    .withDescription("Dynamically registered cron job via REST API")
+                    .withDescription(request.desc())
                     .usingJobData(jobDataMap)
                     .storeDurably()
                     .build();
