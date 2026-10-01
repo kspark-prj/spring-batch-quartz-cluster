@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.quartz.CronScheduleBuilder;
 import org.quartz.CronTrigger;
@@ -216,6 +217,37 @@ public class QuartzJobService {
             throw new RuntimeException("Quartz Job 즉시 실행 실패", e);
         }
     }
+
+    public void triggerJobGroup(String jobGroup, Map<String, Object> extraParams) {
+        try {
+            // 1. 해당 그룹(jobGroup)에 속한 모든 JobKey 조회
+            Set<JobKey> jobKeys = scheduler.getJobKeys(GroupMatcher.jobGroupEquals(jobGroup));
+
+            if (jobKeys.isEmpty()) {
+                log.warn("해당 그룹에 존재하지 않는 JobGroup입니다: {}", jobGroup);
+                return;
+            }
+
+            // 2. 전달할 JobDataMap 설정
+            JobDataMap jobDataMap = new JobDataMap();
+            if (extraParams != null) {
+                jobDataMap.putAll(extraParams);
+            }
+
+            // 3. 그룹 내 모든 Job을 순회하며 즉시 실행
+            for (JobKey jobKey : jobKeys) {
+                scheduler.triggerJob(jobKey, jobDataMap);
+                log.info("Job group item triggered manually. Key: {}", jobKey);
+            }
+
+            log.info("Successfully triggered all jobs in group: {}, Total: {}", jobGroup, jobKeys.size());
+        } catch (SchedulerException e) {
+            log.error("Failed to trigger job group manually. Group: {}", jobGroup, e);
+            throw new RuntimeException("Quartz Job Group 즉시 실행 실패", e);
+        }
+    }
+
+
 
     /**
      * Job 실행 이력을 조회합니다.
