@@ -1,6 +1,9 @@
 package com.example.demo.quartz.job;
 
-import org.quartz.*;
+import org.quartz.DisallowConcurrentExecution;
+import org.quartz.JobDataMap;
+import org.quartz.JobExecutionContext;
+import org.quartz.JobExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.Job;
@@ -22,7 +25,7 @@ public class SampleBatchTriggerJob implements org.quartz.Job {
     private final JobLauncher jobLauncher;
     private final Job customerMigrationJob;
 
-    public SampleBatchTriggerJob(JobLauncher jobLauncher, 
+    public SampleBatchTriggerJob(JobLauncher jobLauncher,
                                  @Qualifier("customerMigrationJob") Job customerMigrationJob) {
         this.jobLauncher = jobLauncher;
         this.customerMigrationJob = customerMigrationJob;
@@ -31,10 +34,18 @@ public class SampleBatchTriggerJob implements org.quartz.Job {
     @Override
     public void execute(JobExecutionContext context) throws JobExecutionException {
         log.info("Quartz Batch Trigger Job started. InstId: {}", context.getFireInstanceId());
+     // 1. JobDataMap 꺼내기
+        JobDataMap dataMap = context.getMergedJobDataMap();
+
+        // 2. 필요 데이터 추출 (예시)
+        String requestedBy = dataMap.getString("requestedBy");
+        Long targetDate = dataMap.containsKey("targetDate") ? dataMap.getLong("targetDate") : System.currentTimeMillis();
 
         try {
             JobParameters jobParameters = new JobParametersBuilder()
                     .addLong("runTime", System.currentTimeMillis())
+                    .addString("requestedBy", requestedBy)
+                    .addLong("targetDate", targetDate)
                     .toJobParameters();
 
             var execution = jobLauncher.run(customerMigrationJob, jobParameters);

@@ -26,6 +26,7 @@ import org.springframework.batch.item.ItemProcessor;
 import org.springframework.batch.item.ItemWriter;
 import org.springframework.batch.repeat.RepeatStatus;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.AsyncTaskExecutor;
@@ -102,7 +103,7 @@ public class CustomerMybatisPagingBatchConfig {
         return new StepBuilder("customerMigrationStep", jobRepository)
                 // [옵션 A 적용 중] Chunk 제네릭에 Future 반환 타입을 설정
                 .<Customer, Future<ProcessedCustomer>>chunk(CHUNK_SIZE, transactionManager)
-                .reader(customerItemReader())
+                .reader(customerItemReader(null, null))
                 .processor(asyncCustomerMybatisPagingProcessor()) // Process 비동기 처리
                 .writer(asyncCustomerMybatisPagingWriter())       // Write 비동기 처리
 
@@ -113,7 +114,10 @@ public class CustomerMybatisPagingBatchConfig {
 
     @Bean
     @StepScope
-    MyBatisPagingItemReader<Customer> customerItemReader() {
+    MyBatisPagingItemReader<Customer> customerItemReader(
+    		@Value("#{jobParameters['requestedBy']}") String requestedBy,
+            @Value("#{jobParameters['targetDate']}") Long targetDate
+            ) {
         Map<String, Object> parameterValues = new HashMap<>();
         parameterValues.put("status", "PENDING");
 
@@ -242,6 +246,18 @@ public class CustomerMybatisPagingBatchConfig {
     @Bean
      Tasklet customerMigrationTasklet() {
         return (contribution, chunkContext) -> {
+
+	// ChunkContext를 경유해서 JobParameters 참조
+	//  Map<String, Object> jobParameters = chunkContext.getStepContext().getJobParameters();
+	//  String requestedBy = (String) jobParameters.get("requestedBy");
+	//
+	//  // 또는 StepExecution을 통해서 직접 객체 형태로 참조
+	//  JobParameters params = contribution.getStepExecution().getJobParameters();
+	//  Long targetDate = params.getLong("targetDate");
+	//
+	//  log.info("RequestedBy: {}, TargetDate: {}", requestedBy, targetDate);
+
+
             // 1. PENDING 상태의 전체 데이터 한 번에 조회
             List<Customer> pendingCustomers = customerMapper.selectCustomersByStatusPending();
             log.info("[Tasklet] Total pending customers fetched: {}", pendingCustomers.size());
