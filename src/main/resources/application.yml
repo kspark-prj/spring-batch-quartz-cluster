@@ -39,11 +39,6 @@ spring:
     job:
       enabled: false
 
-  # 4. Java 21 Virtual Threads 활성화
-  threads:
-    virtual:
-      enabled: true
-
   # 5. Quartz Cluster Mode 설정
   quartz:
     job-store-type: jdbc

@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <!-- ================================================================== -->
+    <!-- 1. 콘솔 출력용 Appender                                              -->
+    <!-- ================================================================== -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{jobName:-NO_JOB}][%X{stepName:-NO_STEP}] %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- ================================================================== -->
+    <!-- 2. MDC(jobName)에 따라 파일을 동적 분리하는 SiftingAppender              -->
+    <!--    - Job 실행 시 MDC에 jobName이 세팅되면 해당 Job 전용 로그 파일에 기록   -->
+    <!--    - MDC에 jobName이 없으면 'default' 파일에 기록                       -->
+    <!--    - 일별 롤링 + 30일 보관 + 단일 파일 100MB 제한 + 총 용량 1GB 캡       -->
+    <!-- ================================================================== -->
+    <appender name="JOB_SIFTING_FILE" class="ch.qos.logback.classic.sift.SiftingAppender">
+        <discriminator class="ch.qos.logback.classic.sift.MDCBasedDiscriminator">
+            <key>jobName</key>
+            <defaultValue>default</defaultValue>
+        </discriminator>
+
+        <sift>
+            <appender name="FILE-${jobName}" class="ch.qos.logback.core.rolling.RollingFileAppender">
+                <file>logs/${jobName}/${jobName}.log</file>
+
+                <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+                    <!-- 일별 롤링 + 파일 사이즈 초과 시 인덱스 부여 -->
+                    <fileNamePattern>logs/${jobName}/archived/${jobName}-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+                    <maxFileSize>100MB</maxFileSize>
+                    <maxHistory>30</maxHistory>
+                    <totalSizeCap>1GB</totalSizeCap>
+                </rollingPolicy>
+
+                <encoder>
+                    <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{jobName}][%X{stepName}] %logger{36} - %msg%n</pattern>
+                </encoder>
+            </appender>
+        </sift>
+    </appender>
+
+    <!-- ================================================================== -->
+    <!-- 3. 프레임워크 로거 설정                                                -->
+    <!--    - Spring / Quartz / Hibernate 등 프레임워크 로그는 콘솔 + default에만 -->
+    <!--      기록되도록 additivity=false로 Job 로그 오염 방지                    -->
+    <!-- ================================================================== -->
+    <logger name="org.springframework" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE" />
+    </logger>
+    <logger name="org.quartz" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE" />
+    </logger>
+    <logger name="org.hibernate" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE" />
+    </logger>
+    <logger name="com.zaxxer.hikari" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE" />
+    </logger>
+
+    <!-- ================================================================== -->
+    <!-- 4. Root Logger: 콘솔 + Job별 파일 출력                                -->
+    <!-- ================================================================== -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE" />
+        <appender-ref ref="JOB_SIFTING_FILE" />
+    </root>
+
+</configuration>

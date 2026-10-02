@@ -11,8 +11,6 @@ import org.mybatis.spring.batch.MyBatisBatchItemWriter;
 import org.mybatis.spring.batch.MyBatisPagingItemReader;
 import org.mybatis.spring.batch.builder.MyBatisBatchItemWriterBuilder;
 import org.mybatis.spring.batch.builder.MyBatisPagingItemReaderBuilder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.StepScope;
@@ -32,19 +30,23 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.transaction.PlatformTransactionManager;
 
+import com.example.demo.batch.listener.JobLoggingListener;  // [추가] JobLoggingListener import
+import com.example.demo.batch.listener.StepLoggingListener; // [추가] StepLoggingListener import
 import com.example.demo.batch.model.Customer;
 import com.example.demo.batch.model.ProcessedCustomer;
 import com.example.demo.mapper.CustomerMapper;
 import com.example.demo.mapper.ProcessedCustomerMapper;
 import com.example.demo.support.ExternalApiSimulator;
 
+import lombok.extern.slf4j.Slf4j;
+
 /**
  * Spring Batch 5.x의 메인 Job/Step 설정 파일입니다.
  */
+@Slf4j
 @Configuration
 public class CustomerMybatisPagingBatchConfig {
 
-    private static final Logger log = LoggerFactory.getLogger(CustomerMybatisPagingBatchConfig.class);
     private static final int CHUNK_SIZE = 1000;
 
     private final JobRepository jobRepository;
@@ -56,30 +58,36 @@ public class CustomerMybatisPagingBatchConfig {
 
     // =========================================================================
     // [MULTITHREAD - 1] 멀티스레드 비동기 처리를 위한 TaskExecutor 주입
-    // Virtual Threads(가상 스레드) 또는 ThreadPoolTaskExecutor를 주입받아 비동기 처리에 활용합니다.
     // =========================================================================
-    private final AsyncTaskExecutor virtualThreadTaskExecutor;
+    private final AsyncTaskExecutor batchTaskExecutor;
+    private final JobLoggingListener jobLoggingListener;   // [1] JobLoggingListener 필드 추가
+    private final StepLoggingListener stepLoggingListener; // [1] StepLoggingListener 필드 추가
 
-     CustomerMybatisPagingBatchConfig(
+    CustomerMybatisPagingBatchConfig(
             JobRepository jobRepository,
             PlatformTransactionManager transactionManager,
             SqlSessionFactory sqlSessionFactory,
             CustomerMapper customerMapper,
             ProcessedCustomerMapper processedCustomerMapper,
             ExternalApiSimulator externalApiSimulator,
-            @Qualifier("virtualThreadTaskExecutor") AsyncTaskExecutor virtualThreadTaskExecutor) {
+            @Qualifier("batchTaskExecutor") AsyncTaskExecutor batchTaskExecutor,
+            JobLoggingListener jobLoggingListener,
+            StepLoggingListener stepLoggingListener) { // [2] 생성자 주입 추가
         this.jobRepository = jobRepository;
         this.transactionManager = transactionManager;
         this.sqlSessionFactory = sqlSessionFactory;
         this.customerMapper = customerMapper;
         this.processedCustomerMapper = processedCustomerMapper;
         this.externalApiSimulator = externalApiSimulator;
-        this.virtualThreadTaskExecutor = virtualThreadTaskExecutor;
+        this.batchTaskExecutor = batchTaskExecutor;
+        this.jobLoggingListener = jobLoggingListener;
+        this.stepLoggingListener = stepLoggingListener;
     }
 
     @Bean(name = "customerMigrationJob")
-     Job customerMigrationJob() {
+    Job customerMigrationJob() {
         return new JobBuilder("customerMigrationJob", jobRepository)
+                .listener(jobLoggingListener) // [3] JobLoggingListener 등록
                 .start(customerMigrationStep())
                 .build();
     }
@@ -106,7 +114,7 @@ public class CustomerMybatisPagingBatchConfig {
                 .reader(customerItemReader(null, null))
                 .processor(asyncCustomerMybatisPagingProcessor()) // Process 비동기 처리
                 .writer(asyncCustomerMybatisPagingWriter())       // Write 비동기 처리
-
+                .listener(stepLoggingListener) // [4] StepLoggingListener 등록 (비동기 MDC 및 로깅 유지)
                 // [옵션 B로 변경시 주석 해제] Step 단위 전체 멀티스레드 병렬 처리 시 사용
                 // .taskExecutor(virtualThreadTaskExecutor)
                 .build();
@@ -115,7 +123,7 @@ public class CustomerMybatisPagingBatchConfig {
     @Bean
     @StepScope
     MyBatisPagingItemReader<Customer> customerItemReader(
-    		@Value("#{jobParameters['requestedBy']}") String requestedBy,
+            @Value("#{jobParameters['requestedBy']}") String requestedBy,
             @Value("#{jobParameters['targetDate']}") Long targetDate
             ) {
         Map<String, Object> parameterValues = new HashMap<>();
@@ -138,7 +146,7 @@ public class CustomerMybatisPagingBatchConfig {
     }
 
     @Bean
-     ItemProcessor<Customer, ProcessedCustomer> customerMybatisPagingProcessor() {
+    ItemProcessor<Customer, ProcessedCustomer> customerMybatisPagingProcessor() {
         return customer -> {
             log.debug("Processing customer: {}", customer.id());
             String apiResult = externalApiSimulator.callExternalValidationApi(customer.id(), customer.email());
@@ -158,15 +166,15 @@ public class CustomerMybatisPagingBatchConfig {
     //   I/O 응답 대기 시간 동안 다른 아이템을 병렬 처리합니다.
     // =========================================================================
     @Bean
-     AsyncItemProcessor<Customer, ProcessedCustomer> asyncCustomerMybatisPagingProcessor() {
+    AsyncItemProcessor<Customer, ProcessedCustomer> asyncCustomerMybatisPagingProcessor() {
         AsyncItemProcessor<Customer, ProcessedCustomer> asyncProcessor = new AsyncItemProcessor<>();
         asyncProcessor.setDelegate(customerMybatisPagingProcessor());
-        asyncProcessor.setTaskExecutor(virtualThreadTaskExecutor); // 가상 스레드 Executor 적용
+        asyncProcessor.setTaskExecutor(batchTaskExecutor); // 가상 스레드 Executor 적용
         return asyncProcessor;
     }
 
     @Bean
-     ItemWriter<ProcessedCustomer> customerMybatisPagingItemWriter() {
+    ItemWriter<ProcessedCustomer> customerMybatisPagingItemWriter() {
 
         // =========================================================================
         // 1. Target 테이블(processed_customer) 저장용 MyBatisBatchItemWriter 생성
@@ -219,7 +227,7 @@ public class CustomerMybatisPagingBatchConfig {
     //   모든 작업 완료 후 집합(Chunk)으로 단일 ItemWriter로 넘겨 DB 대량 처리합니다.
     // =========================================================================
     @Bean
-     AsyncItemWriter<ProcessedCustomer> asyncCustomerMybatisPagingWriter() {
+    AsyncItemWriter<ProcessedCustomer> asyncCustomerMybatisPagingWriter() {
         AsyncItemWriter<ProcessedCustomer> asyncWriter = new AsyncItemWriter<>();
         asyncWriter.setDelegate(customerMybatisPagingItemWriter());
         return asyncWriter;
@@ -230,32 +238,34 @@ public class CustomerMybatisPagingBatchConfig {
     // =========================================================================
 
     @Bean(name = "customerMigrationTaskletJob")
-     Job customerMigrationTaskletJob() {
+    Job customerMigrationTaskletJob() {
         return new JobBuilder("customerMigrationTaskletJob", jobRepository)
+                .listener(jobLoggingListener) // [5] Tasklet Job에도 JobLoggingListener 등록
                 .start(customerMigrationTaskletStep())
                 .build();
     }
 
     @Bean
-     Step customerMigrationTaskletStep() {
+    Step customerMigrationTaskletStep() {
         return new StepBuilder("customerMigrationTaskletStep", jobRepository)
                 .tasklet(customerMigrationTasklet(), transactionManager)
+                .listener(stepLoggingListener) // [6] Tasklet Step에도 StepLoggingListener 등록
                 .build();
     }
 
     @Bean
-     Tasklet customerMigrationTasklet() {
+    Tasklet customerMigrationTasklet() {
         return (contribution, chunkContext) -> {
 
-	// ChunkContext를 경유해서 JobParameters 참조
-	//  Map<String, Object> jobParameters = chunkContext.getStepContext().getJobParameters();
-	//  String requestedBy = (String) jobParameters.get("requestedBy");
-	//
-	//  // 또는 StepExecution을 통해서 직접 객체 형태로 참조
-	//  JobParameters params = contribution.getStepExecution().getJobParameters();
-	//  Long targetDate = params.getLong("targetDate");
-	//
-	//  log.info("RequestedBy: {}, TargetDate: {}", requestedBy, targetDate);
+            // ChunkContext를 경유해서 JobParameters 참조
+            //  Map<String, Object> jobParameters = chunkContext.getStepContext().getJobParameters();
+            //  String requestedBy = (String) jobParameters.get("requestedBy");
+            //
+            //  // 또는 StepExecution을 통해서 직접 객체 형태로 참조
+            //  JobParameters params = contribution.getStepExecution().getJobParameters();
+            //  Long targetDate = params.getLong("targetDate");
+            //
+            //  log.info("RequestedBy: {}, TargetDate: {}", requestedBy, targetDate);
 
 
             // 1. PENDING 상태의 전체 데이터 한 번에 조회

@@ -14,6 +14,7 @@ import com.example.demo.quartz.dto.JobRequest;
 import com.example.demo.quartz.job.CustomerMigrationQuartzJob;
 import com.example.demo.quartz.job.SampleBatchTriggerJob;
 import com.example.demo.quartz.job.SampleSystemMonitoringJob;
+import com.example.demo.quartz.listener.QuartzJobMdcListener;
 import com.example.demo.quartz.service.QuartzJobService;
 
 /**
@@ -26,14 +27,21 @@ public class QuartzJobInitializer implements CommandLineRunner {
 
     private final QuartzJobService quartzJobService;
     private final Scheduler scheduler;
+    private final QuartzJobMdcListener quartzJobMdcListener;
 
-    public QuartzJobInitializer(QuartzJobService quartzJobService, SchedulerFactoryBean schedulerFactoryBean) {
+    public QuartzJobInitializer(QuartzJobService quartzJobService,
+                                SchedulerFactoryBean schedulerFactoryBean,
+                                QuartzJobMdcListener quartzJobMdcListener) {
         this.quartzJobService = quartzJobService;
         this.scheduler = schedulerFactoryBean.getScheduler();
+        this.quartzJobMdcListener = quartzJobMdcListener;
     }
 
     @Override
     public void run(String... args) throws Exception {
+        // 모든 Quartz Job에 대해 MDC 자동 관리 리스너 글로벌 등록
+        scheduler.getListenerManager().addJobListener(quartzJobMdcListener);
+
         log.info("Quartz 기본 크론 스케줄링 검사 및 자동 등록 시작...");
 
         JobKey monitorKey = new JobKey("DefaultSystemMonitoringJob", "MONITOR_GROUP");

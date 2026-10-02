@@ -11,8 +11,6 @@ import org.mybatis.spring.batch.MyBatisBatchItemWriter;
 import org.mybatis.spring.batch.MyBatisCursorItemReader;
 import org.mybatis.spring.batch.builder.MyBatisBatchItemWriterBuilder;
 import org.mybatis.spring.batch.builder.MyBatisCursorItemReaderBuilder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.StepScope;
@@ -29,17 +27,21 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.transaction.PlatformTransactionManager;
 
+import com.example.demo.batch.listener.JobLoggingListener;  // [추가] JobLoggingListener import
+import com.example.demo.batch.listener.StepLoggingListener; // [추가] StepLoggingListener import
 import com.example.demo.batch.model.Customer;
 import com.example.demo.batch.model.ProcessedCustomer;
 import com.example.demo.support.ExternalApiSimulator;
 
+import lombok.extern.slf4j.Slf4j;
+
 /**
  * MyBatisCursorItemReader 기반 Spring Batch 5.x 설정 클래스입니다.
  */
+@Slf4j
 @Configuration
 public class CustomerMybatisCursorBatchConfig {
 
-    private static final Logger log = LoggerFactory.getLogger(CustomerMybatisCursorBatchConfig.class);
     private static final int CHUNK_SIZE = 1000;
 
     private final JobRepository jobRepository;
@@ -49,26 +51,32 @@ public class CustomerMybatisCursorBatchConfig {
 
     // =========================================================================
     // [MULTITHREAD - 1] 멀티스레드 비동기 처리를 위한 TaskExecutor 주입
-    // Virtual Threads(가상 스레드) 또는 ThreadPoolTaskExecutor를 주입받아 비동기 처리에 활용합니다.
     // =========================================================================
-    private final AsyncTaskExecutor virtualThreadTaskExecutor;
+    private final AsyncTaskExecutor batchTaskExecutor;
+    private final JobLoggingListener jobLoggingListener;   // [1] JobLoggingListener 필드 추가
+    private final StepLoggingListener stepLoggingListener; // [1] StepLoggingListener 필드 추가
 
     public CustomerMybatisCursorBatchConfig(
             JobRepository jobRepository,
             PlatformTransactionManager transactionManager,
             SqlSessionFactory sqlSessionFactory,
             ExternalApiSimulator externalApiSimulator,
-            @Qualifier("virtualThreadTaskExecutor") AsyncTaskExecutor virtualThreadTaskExecutor) {
+            @Qualifier("batchTaskExecutor") AsyncTaskExecutor batchTaskExecutor,
+            JobLoggingListener jobLoggingListener,
+            StepLoggingListener stepLoggingListener) { // [2] 생성자 주입 추가
         this.jobRepository = jobRepository;
         this.transactionManager = transactionManager;
         this.sqlSessionFactory = sqlSessionFactory;
         this.externalApiSimulator = externalApiSimulator;
-        this.virtualThreadTaskExecutor = virtualThreadTaskExecutor;
+        this.batchTaskExecutor = batchTaskExecutor;
+        this.jobLoggingListener = jobLoggingListener;
+        this.stepLoggingListener = stepLoggingListener;
     }
 
     @Bean(name = "customerCursorMigrationJob")
     Job customerCursorMigrationJob() {
         return new JobBuilder("customerCursorMigrationJob", jobRepository)
+                .listener(jobLoggingListener) // [로그백 잡별 분리를 위한 Job 리스너 등록]
                 .start(customerCursorMigrationStep())
                 .build();
     }
@@ -87,6 +95,7 @@ public class CustomerMybatisCursorBatchConfig {
                 .reader(customerMybatisCursorItemReader())
                 .processor(asyncCustomerMybatisCursorProcessor()) // 멀티스레드 비동기 Processor
                 .writer(asyncCustomerMybatisCursorWriter())       // 비동기 결과 취합/저장 Writer
+                .listener(stepLoggingListener) // [3] Step 리스너 등록 (비동기 스레드 MDC 및 로깅 지원)
                 // .taskExecutor(virtualThreadTaskExecutor) <-- 주의: MyBatis Cursor Reader 사용 시 주석 해제 금지!
                 .build();
     }
@@ -140,12 +149,12 @@ public class CustomerMybatisCursorBatchConfig {
     AsyncItemProcessor<Customer, ProcessedCustomer> asyncCustomerMybatisCursorProcessor() {
         AsyncItemProcessor<Customer, ProcessedCustomer> asyncProcessor = new AsyncItemProcessor<>();
         asyncProcessor.setDelegate(customerMybatisCursorProcessor());
-        asyncProcessor.setTaskExecutor(virtualThreadTaskExecutor); // 가상 스레드 Executor 전달
+        asyncProcessor.setTaskExecutor(batchTaskExecutor); // 가상 스레드 Executor 전달
         return asyncProcessor;
     }
 
     @Bean
-    public ItemWriter<ProcessedCustomer> customerMybatisItemWriter() {
+    ItemWriter<ProcessedCustomer> customerMybatisItemWriter() {
 
         // 1. Target 테이블(processed_customer) 저장용 MyBatisBatchItemWriter
         MyBatisBatchItemWriter<ProcessedCustomer> processedWriter = new MyBatisBatchItemWriterBuilder<ProcessedCustomer>()
@@ -190,7 +199,7 @@ public class CustomerMybatisCursorBatchConfig {
     //   Chunk 크기만큼 완료되길 기다린 후, 한 번에 MyBatis Batch Writer로 전달하여 DB에 집단 처리합니다.
     // =========================================================================
     @Bean
-    public AsyncItemWriter<ProcessedCustomer> asyncCustomerMybatisCursorWriter() {
+    AsyncItemWriter<ProcessedCustomer> asyncCustomerMybatisCursorWriter() {
         AsyncItemWriter<ProcessedCustomer> asyncWriter = new AsyncItemWriter<>();
         asyncWriter.setDelegate(customerMybatisItemWriter());
         return asyncWriter;

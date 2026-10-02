@@ -3,9 +3,11 @@ import com.example.demo.quartz.service.WebCrawlerService;
 import org.quartz.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -36,18 +38,28 @@ public class ParallelCrawlJob implements org.quartz.Job {
             return;
         }
 
+        // 가상 스레드로 MDC 전파를 위해 부모 스레드의 MDC 컨텍스트 캡처
+        // (QuartzJobMdcListener가 세팅한 MDC를 자식 가상 스레드에도 전달)
+        Map<String, String> parentMdc = MDC.getCopyOfContextMap();
+
         // 작업 단위마다 가상 스레드를 생성하는 Executor 사용 (try-with-resources로 자동 종료 관리)
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
 
             // 각 URL에 대해 가상 스레드 기반의 비동기 크롤링 작업 생성
             List<CompletableFuture<Void>> futures = targetUrls.stream()
                     .map(url -> CompletableFuture.runAsync(() -> {
+                        // 자식 가상 스레드에 부모 MDC 컨텍스트 수동 전파
+                        if (parentMdc != null) {
+                            MDC.setContextMap(parentMdc);
+                        }
                         try {
                             log.info("Start crawling [VirtualThread: {}]: {}", Thread.currentThread(), url);
                             webCrawlerService.crawl(url);
                             log.info("Finished crawling: {}", url);
                         } catch (Exception e) {
                             log.error("Failed to crawl URL: {}", url, e);
+                        } finally {
+                            MDC.clear();
                         }
                     }, executor))
                     .toList();

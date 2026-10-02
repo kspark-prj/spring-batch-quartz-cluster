@@ -14,7 +14,7 @@
         FROM customer
         WHERE status = #{status}
         ORDER BY id ASC
-        LIMIT #{_pagesize} OFFSET 0
+        LIMIT #{_pagesize} OFFSET #{_skiprows}
     </select>
 
     <!-- 2) Cursor 전용 쿼리 (MyBatisCursorItemReader용) -->
