@@ -1,6 +1,8 @@
 # Clustered Quartz & Spring Batch 5.x with Java 21 Virtual Threads & Spring Security
 
-이 프로젝트는 **Java 21**, **Spring Boot 3.2.4**, **Spring Security 6.x**, **Spring Batch 5.x**, **Quartz Scheduler (Cluster Mode)**, **MyBatis 3.x**, **Spring Data JPA**, **PostgreSQL**을 활용하여 멀티 노드 환경에서 중복 실행 없이 안전하게 스케줄링을 관리하고, 대용량 처리를 고성능 병렬 방식으로 처리하는 모니터링 대시보드 포함 백엔드 아키텍처 실무 예제입니다.
+**Java 21**, **Spring Boot 3.2.4**,**Spring Security 6.x**,**Spring Batch 5.x**,**Quartz Scheduler (Cluster Mode)**,**MyBatis 3.x**,**Spring Data JPA**,**PostgreSQL**  
+활용하여 멀티 노드 환경에서 중복 실행 없이 안전하게 스케줄링을 관리하고,대용량 처리를 고성능 병렬 방식으로 처리하는  
+모니터링 대시보드 포함 백엔드 아키텍처 실무 예제입니다.  
 
 ---
 
