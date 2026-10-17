@@ -1,5 +1,6 @@
 package com.example.demo.quartz.job;
 
+import org.quartz.DisallowConcurrentExecution;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
 import org.springframework.batch.core.Job;
@@ -14,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Component
+@DisallowConcurrentExecution
 @RequiredArgsConstructor
 public class CustomerMigrationQuartzJob implements org.quartz.Job {
 
